@@ -43,6 +43,13 @@ init =
 type Msg
     = DiceClicked Int
     | ButtonRollClicked
+    | DiceRolled (List Int)
+
+
+rollDiceset : Random.Generator (List Int)
+rollDiceset =
+    Random.int 1 6
+        |> Random.list 6
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -64,12 +71,17 @@ update msg model =
                 ( { model | diceset = newDiceset }, Cmd.none )
 
         ButtonRollClicked ->
+            ( model, Random.generate DiceRolled rollDiceset )
+
+        DiceRolled result ->
             let
                 mapper =
-                    \dice -> Dice.roll (1 + dice.face % 6) dice
+                    \x -> \dice -> Dice.roll x dice
 
                 newDiceset =
-                    Array.map mapper model.diceset
+                    Array.toList model.diceset
+                        |> List.map2 mapper result
+                        |> Array.fromList
             in
                 ( { model | diceset = newDiceset }, Cmd.none )
 
