@@ -106,14 +106,14 @@ createDots width dots =
 
                     --
                     y =
-                        String.fromInt (round (pcx * widthFloat))
+                        String.fromInt (round (pcy * widthFloat))
 
                     r =
                         String.fromInt (round (widthFloat / 10))
                 in
                 Svg.circle
                     [ Attributes.cx x
-                    , Attributes.cy x
+                    , Attributes.cy y
                     , Attributes.r r
                     , Attributes.fill "#000000"
                     ]
