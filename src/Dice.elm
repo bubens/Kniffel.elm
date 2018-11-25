@@ -1,4 +1,9 @@
-module Dice exposing (Dice, create, roll, hold, toSVG)
+module Dice exposing
+    ( Dice
+    , create
+    , roll, hold
+    , toSVG
+    )
 
 {-| This module is a small helper to create, handle and visualize a Dice.
 
@@ -24,9 +29,9 @@ module Dice exposing (Dice, create, roll, hold, toSVG)
 
 -}
 
+import Array
 import Html
 import Svg
-import Array
 import Svg.Attributes as Attributes
 
 
@@ -44,9 +49,9 @@ type alias Dice =
 {-| Create a Dice with a predefined face.
 A newly created Dice will not be held.
 
+
     myDice =
         Dice.create 1
-
 
     -- -> { face = 1, held = False } : Dice.Dice
 
@@ -68,6 +73,7 @@ roll : Int -> Dice -> Dice
 roll newFace dice =
     if dice.held == False then
         { dice | face = newFace }
+
     else
         dice
 
@@ -85,28 +91,41 @@ hold isHeld dice =
     { dice | held = isHeld }
 
 
-toCircle : ( Int, Int ) -> Svg.Svg msg
-toCircle ( pcx, pcy ) =
-    Svg.circle
-        [ Attributes.cx (toString pcx)
-        , Attributes.cy (toString pcy)
-        , Attributes.r "10"
-        , Attributes.fill "#000000"
-        ]
-        []
-
-
-createDots : List Int -> List (Svg.Svg msg)
-createDots requiredDots =
-    requiredDots
+createDots : Int -> List Int -> List (Svg.Svg msg)
+createDots width dots =
+    dots
         |> List.map (\x -> getCoords x)
-        |> List.map toCircle
+        |> List.map
+            (\( pcx, pcy ) ->
+                let
+                    widthFloat =
+                        toFloat width
+
+                    x =
+                        String.fromInt (round (pcx * widthFloat))
+
+                    --
+                    y =
+                        String.fromInt (round (pcx * widthFloat))
+
+                    r =
+                        String.fromInt (round (widthFloat / 10))
+                in
+                Svg.circle
+                    [ Attributes.cx x
+                    , Attributes.cy x
+                    , Attributes.r r
+                    , Attributes.fill "#000000"
+                    ]
+                    []
+            )
 
 
 getBgColor : Dice -> String
 getBgColor dice =
     if dice.held == True then
         "#787878"
+
     else
         "#FFFFFF"
 
@@ -122,47 +141,53 @@ getBgColor dice =
         Dice.toSVG model
 
 -}
-toSVG : Dice -> Html.Html msg
-toSVG dice =
+toSVG : Int -> Dice -> Html.Html msg
+toSVG width dice =
     let
+        strWidth =
+            String.fromInt width
+
+        strViewBox =
+            "0 0 " ++ strWidth ++ " " ++ strWidth
+
         dots =
             Array.get (dice.face - 1) requiredDots
 
         backgroundColor =
             getBgColor dice
     in
-        case dots of
-            Just dots ->
-                createDots dots
-                    |> (::)
-                        (Svg.rect
-                            [ Attributes.width "100"
-                            , Attributes.height "100"
-                            , Attributes.x "0"
-                            , Attributes.y "0"
-                            , Attributes.fill (getBgColor dice)
-                            ]
-                            []
-                        )
-                    |> Svg.svg
-                        [ Attributes.width "100"
-                        , Attributes.height "100"
-                        , Attributes.viewBox "0 0 100 100"
+    case dots of
+        Just goodDots ->
+            createDots width goodDots
+                |> (::)
+                    (Svg.rect
+                        [ Attributes.width strWidth
+                        , Attributes.height strWidth
+                        , Attributes.x "0"
+                        , Attributes.y "0"
+                        , Attributes.fill (getBgColor dice)
                         ]
+                        []
+                    )
+                |> Svg.svg
+                    [ Attributes.width strWidth
+                    , Attributes.height strWidth
+                    , Attributes.viewBox strViewBox
+                    ]
 
-            Nothing ->
-                Svg.svg
-                    [ Attributes.width "100"
-                    , Attributes.height "100"
-                    , Attributes.viewBox "0 0 100 100"
+        Nothing ->
+            Svg.svg
+                [ Attributes.width strWidth
+                , Attributes.height strWidth
+                , Attributes.viewBox strViewBox
+                ]
+                [ Svg.text_
+                    [ Attributes.x (String.fromInt (width // 4))
+                    , Attributes.y (String.fromInt (width // 4))
+                    , Attributes.fill "red"
                     ]
-                    [ Svg.text_
-                        [ Attributes.x "25"
-                        , Attributes.y "25"
-                        , Attributes.fill "red"
-                        ]
-                        [ Svg.text "Error" ]
-                    ]
+                    [ Svg.text "Error" ]
+                ]
 
 
 requiredDots : Array.Array (List Int)
@@ -177,28 +202,28 @@ requiredDots =
         ]
 
 
-getCoords : Int -> ( Int, Int )
+getCoords : Int -> ( Float, Float )
 getCoords position =
     let
         coords =
             Array.get position dotCoords
     in
-        case coords of
-            Just coords ->
-                coords
+    case coords of
+        Just goodCoords ->
+            goodCoords
 
-            Nothing ->
-                getCoords 0
+        Nothing ->
+            getCoords 0
 
 
-dotCoords : Array.Array ( Int, Int )
+dotCoords : Array.Array ( Float, Float )
 dotCoords =
     Array.fromList
-        [ ( 20, 20 )
-        , ( 80, 20 )
-        , ( 20, 50 )
-        , ( 50, 50 )
-        , ( 80, 50 )
-        , ( 20, 80 )
-        , ( 80, 80 )
+        [ ( 0.2, 0.2 )
+        , ( 0.8, 0.2 )
+        , ( 0.2, 0.5 )
+        , ( 0.5, 0.5 )
+        , ( 0.8, 0.5 )
+        , ( 0.2, 0.8 )
+        , ( 0.8, 0.8 )
         ]

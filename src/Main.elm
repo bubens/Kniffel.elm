@@ -1,15 +1,14 @@
-module Main exposing (..)
+module Main exposing (Diceset, Model, Msg(..), createDiceList, createListItem, init, main, rollDiceset, subscriptions, update, view)
 
-import Html
-import Html exposing (Html)
-import Html.Events as Events
-import Html.Attributes as Attributes
-import Dice exposing (Dice)
-import Dice
-import List
 import Array exposing (Array)
-import Array
+import Browser
+import Dice exposing (Dice)
+import Html exposing (Html)
+import Html.Attributes as Attributes
+import Html.Events as Events
+import List
 import Random
+
 
 
 -- MODEL
@@ -27,8 +26,8 @@ type alias Model =
 -- INIT
 
 
-init : ( Model, Cmd Msg )
-init =
+init : () -> ( Model, Cmd Msg )
+init _ =
     ( Array.fromList [ 1, 1, 1, 1, 1 ]
         |> Array.map (\x -> Dice.create x)
         |> Model
@@ -62,13 +61,14 @@ update msg model =
                         \dice ->
                             if i == index then
                                 Dice.hold (not dice.held) dice
+
                             else
                                 dice
 
                 newDiceset =
                     Array.indexedMap mapper model.diceset
             in
-                ( { model | diceset = newDiceset }, Cmd.none )
+            ( { model | diceset = newDiceset }, Cmd.none )
 
         ButtonRollClicked ->
             ( model, Random.generate DiceRolled rollDiceset )
@@ -83,19 +83,34 @@ update msg model =
                         |> List.map2 mapper result
                         |> Array.fromList
             in
-                ( { model | diceset = newDiceset }, Cmd.none )
+            ( { model | diceset = newDiceset }, Cmd.none )
 
 
 
 -- VIEW
 
 
+getDiceWidth : Int -> Bool -> Int
+getDiceWidth width isHeld =
+    if isHeld == True then
+        toFloat width
+            |> (*) 0.8
+            |> round
+
+    else
+        width
+
+
 createListItem : Int -> Dice -> Html Msg
 createListItem index dice =
+    let
+        width =
+            getDiceWidth 100 dice.held
+    in
     Html.li
         [ Events.onClick (DiceClicked index)
         ]
-        [ Dice.toSVG dice
+        [ Dice.toSVG width dice
         ]
 
 
@@ -134,7 +149,7 @@ subscriptions model =
 
 
 main =
-    Html.program
+    Browser.element
         { init = init
         , view = view
         , update = update
