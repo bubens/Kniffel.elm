@@ -144,11 +144,11 @@ getBgColor dice =
 toSVG : Int -> Dice -> Html.Html msg
 toSVG width dice =
     let
-        strWidth =
+        widthString =
             String.fromInt width
 
-        strViewBox =
-            "0 0 " ++ strWidth ++ " " ++ strWidth
+        viewBoxString =
+            "0 0 " ++ widthString ++ " " ++ widthString
 
         dots =
             Array.get (dice.face - 1) requiredDots
@@ -161,8 +161,8 @@ toSVG width dice =
             createDots width goodDots
                 |> (::)
                     (Svg.rect
-                        [ Attributes.width strWidth
-                        , Attributes.height strWidth
+                        [ Attributes.width widthString
+                        , Attributes.height widthString
                         , Attributes.x "0"
                         , Attributes.y "0"
                         , Attributes.fill (getBgColor dice)
@@ -170,16 +170,16 @@ toSVG width dice =
                         []
                     )
                 |> Svg.svg
-                    [ Attributes.width strWidth
-                    , Attributes.height strWidth
-                    , Attributes.viewBox strViewBox
+                    [ Attributes.width widthString
+                    , Attributes.height widthString
+                    , Attributes.viewBox viewBoxString
                     ]
 
         Nothing ->
             Svg.svg
-                [ Attributes.width strWidth
-                , Attributes.height strWidth
-                , Attributes.viewBox strViewBox
+                [ Attributes.width widthString
+                , Attributes.height widthString
+                , Attributes.viewBox viewBoxString
                 ]
                 [ Svg.text_
                     [ Attributes.x (String.fromInt (width // 4))
