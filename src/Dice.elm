@@ -1,13 +1,9 @@
-<<<<<<< current
 module Dice exposing
     ( Dice
     , create
     , roll, hold
     , toSVG
     )
-=======
-module Dice exposing (Dice, Face, One, Two, Three, Four, Five, Six, create, roll, hold, toSVG)
->>>>>>> before discard
 
 {-| This module is a small helper to create, handle and visualize a Dice.
 
