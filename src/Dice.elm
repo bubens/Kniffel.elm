@@ -35,22 +35,13 @@ import Svg
 import Svg.Attributes as Attributes
 
 
-type Face
-    = One
-    | Two
-    | Three
-    | Four
-    | Five
-    | Six
-
-
 {-| Definition of a Type Dice.
 
     Dice 1 False
 
 -}
 type alias Dice =
-    { face : Face
+    { face : Int
     , held : Bool
     }
 
@@ -65,7 +56,7 @@ A newly created Dice will not be held.
     -- -> { face = 1, held = False } : Dice.Dice
 
 -}
-create : Face -> Dice
+create : Int -> Dice
 create initFace =
     Dice initFace False
 
@@ -78,7 +69,7 @@ Will only if the dice is not currently held.
     -- -> { face = 3, held = False } : Dice.Dice
 
 -}
-roll : Face -> Dice -> Dice
+roll : Int -> Dice -> Dice
 roll newFace dice =
     if dice.held == False then
         { dice | face = newFace }
