@@ -1,4 +1,4 @@
-module Main exposing (Diceset, Model, Msg(..), createDiceList, createListItem, init, main, rollDiceset, subscriptions, update, view)
+module Main exposing (Diceset, Model, Msg(..), createDiceListHtml, createListItemHtml, init, main, rollDiceset, subscriptions, update, view)
 
 import Array exposing (Array)
 import Browser
@@ -18,19 +18,56 @@ type alias Diceset =
     Array Dice
 
 
+type EntryType
+    = Sum Int
+    | Predefined Int
+
+
+type alias Entry =
+    { name : String
+    , entryType : EntryType
+    , value : Int
+    , entered : Bool
+    }
+
+
 type alias Model =
-    { diceset : Diceset }
+    { diceset : Diceset
+    , entries : List Entry
+    }
 
 
 
 -- INIT
 
 
+createEntry : String -> EntryType -> Entry
+createEntry name type_ =
+    Entry name type_ -1 False
+
+
+initDiceset : List Int -> Diceset
+initDiceset initvals =
+    Array.fromList initvals
+        |> Array.map (\x -> Dice.create x)
+
+
+initEntries : List Entry
+initEntries =
+    [ createEntry "Ones" (Sum 1)
+    , createEntry "Twos" (Sum 2)
+    , createEntry "Threes" (Sum 3)
+    , createEntry "Fours" (Sum 4)
+    , createEntry "Fives" (Sum 5)
+    , createEntry "Six" (Sum 6)
+    ]
+
+
 init : () -> ( Model, Cmd Msg )
 init _ =
-    ( Array.fromList [ 1, 1, 1, 1, 1 ]
-        |> Array.map (\x -> Dice.create x)
-        |> Model
+    ( Model
+        (initDiceset [ 1, 1, 1, 1, 1 ])
+        initEntries
     , Cmd.none
     )
 
@@ -101,37 +138,50 @@ getDiceWidth width isHeld =
         width
 
 
-createListItem : Int -> Dice -> Html Msg
-createListItem index dice =
+createListItemHtml : Int -> Dice -> Html Msg
+createListItemHtml index dice =
     let
         width =
             getDiceWidth 100 dice.held
     in
     Html.li
         [ Events.onClick (DiceClicked index)
+        , Attributes.style "float" "left"
         ]
         [ Dice.toSVG width dice
         ]
 
 
-createDiceList : Diceset -> Html Msg
-createDiceList diceset =
+createDiceListHtml : Diceset -> Html Msg
+createDiceListHtml diceset =
     diceset
-        |> Array.indexedMap createListItem
+        |> Array.indexedMap createListItemHtml
         |> Array.toList
-        |> Html.ul []
+        |> Html.ul [ Attributes.style "list-style" "none" ]
+
+
+
+--Attributes.style
+
+
+createEntriesHtml : List Entry -> Html Msg
+createEntriesHtml entries =
+    Html.table [] []
 
 
 view : Model -> Html Msg
 view model =
     Html.div
         [ Attributes.id "main" ]
-        [ createDiceList model.diceset
+        [ createDiceListHtml model.diceset
         , Html.button
             [ Events.onClick ButtonRollClicked
+            , Attributes.style "clear" "both"
+            , Attributes.style "display" "block"
             ]
             [ Html.text "Roll!"
             ]
+        , createEntriesHtml model.entries
         ]
 
 
