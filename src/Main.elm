@@ -60,6 +60,13 @@ initEntries =
     , initEntry "Fours" (Sum 4) -1 False
     , initEntry "Fives" (Sum 5) -1 False
     , initEntry "Six" (Sum 6) -1 False
+    , initEntry "All 3" (Sum 0) -1 False
+    , initEntry "All 4" (Sum 0) -1 False
+    , initEntry "Full House" (Predefined 35) -1 False
+    , initEntry "Small Straight" (Predefined 30) -1 False
+    , initEntry "Large Straight" (Predefined 40) -1 False
+    , initEntry "Yahtzee" (Predefined 50) -1 False
+    , initEntry "Chance" (Sum 0) -1 False
     ]
 
 

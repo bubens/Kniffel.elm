@@ -1,9 +1,13 @@
+<<<<<<< current
 module Dice exposing
     ( Dice
     , create
     , roll, hold
     , toSVG
     )
+=======
+module Dice exposing (Dice, Face, One, Two, Three, Four, Five, Six, create, roll, hold, toSVG)
+>>>>>>> before discard
 
 {-| This module is a small helper to create, handle and visualize a Dice.
 
@@ -35,13 +39,22 @@ import Svg
 import Svg.Attributes as Attributes
 
 
+type Face
+    = One
+    | Two
+    | Three
+    | Four
+    | Five
+    | Six
+
+
 {-| Definition of a Type Dice.
 
     Dice 1 False
 
 -}
 type alias Dice =
-    { face : Int
+    { face : Face
     , held : Bool
     }
 
@@ -56,7 +69,7 @@ A newly created Dice will not be held.
     -- -> { face = 1, held = False } : Dice.Dice
 
 -}
-create : Int -> Dice
+create : Face -> Dice
 create initFace =
     Dice initFace False
 
@@ -69,7 +82,7 @@ Will only if the dice is not currently held.
     -- -> { face = 3, held = False } : Dice.Dice
 
 -}
-roll : Int -> Dice -> Dice
+roll : Face -> Dice -> Dice
 roll newFace dice =
     if dice.held == False then
         { dice | face = newFace }
