@@ -41,9 +41,9 @@ type alias Model =
 -- INIT
 
 
-createEntry : String -> EntryType -> Entry
-createEntry name type_ =
-    Entry name type_ -1 False
+initEntry : String -> EntryType -> Int -> Bool -> Entry
+initEntry name type_ value held =
+    Entry name type_ value held
 
 
 initDiceset : List Int -> Diceset
@@ -54,12 +54,12 @@ initDiceset initvals =
 
 initEntries : List Entry
 initEntries =
-    [ createEntry "Ones" (Sum 1)
-    , createEntry "Twos" (Sum 2)
-    , createEntry "Threes" (Sum 3)
-    , createEntry "Fours" (Sum 4)
-    , createEntry "Fives" (Sum 5)
-    , createEntry "Six" (Sum 6)
+    [ initEntry "Ones" (Sum 1) -1 False
+    , initEntry "Twos" (Sum 2) -1 False
+    , initEntry "Threes" (Sum 3) -1 False
+    , initEntry "Fours" (Sum 4) -1 False
+    , initEntry "Fives" (Sum 5) -1 False
+    , initEntry "Six" (Sum 6) -1 False
     ]
 
 
@@ -80,6 +80,7 @@ type Msg
     = DiceClicked Int
     | ButtonRollClicked
     | DiceRolled (List Int)
+    | EntryClicked String
 
 
 rollDiceset : Random.Generator (List Int)
@@ -88,39 +89,69 @@ rollDiceset =
         |> Random.list 6
 
 
+updateDiceClicked : Int -> Model -> ( Model, Cmd Msg )
+updateDiceClicked index model =
+    let
+        mapper =
+            \i ->
+                \dice ->
+                    if i == index then
+                        Dice.hold (not dice.held) dice
+
+                    else
+                        dice
+
+        newDiceset =
+            Array.indexedMap mapper model.diceset
+    in
+    ( { model | diceset = newDiceset }, Cmd.none )
+
+
+updateDiceRolled : List Int -> Model -> ( Model, Cmd Msg )
+updateDiceRolled result model =
+    let
+        mapper =
+            \x -> \dice -> Dice.roll x dice
+
+        newDiceset =
+            Array.toList model.diceset
+                |> List.map2 mapper result
+                |> Array.fromList
+    in
+    ( { model | diceset = newDiceset }, Cmd.none )
+
+
+updateEntryClicked : String -> Model -> ( Model, Cmd Msg )
+updateEntryClicked name model =
+    let
+        mapper =
+            \entry ->
+                if entry.name == name then
+                    initEntry entry.name entry.entryType 999 True
+
+                else
+                    entry
+
+        newEntries =
+            List.map mapper model.entries
+    in
+    ( { model | entries = newEntries }, Cmd.none )
+
+
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
         DiceClicked index ->
-            let
-                mapper =
-                    \i ->
-                        \dice ->
-                            if i == index then
-                                Dice.hold (not dice.held) dice
-
-                            else
-                                dice
-
-                newDiceset =
-                    Array.indexedMap mapper model.diceset
-            in
-            ( { model | diceset = newDiceset }, Cmd.none )
+            updateDiceClicked index model
 
         ButtonRollClicked ->
             ( model, Random.generate DiceRolled rollDiceset )
 
         DiceRolled result ->
-            let
-                mapper =
-                    \x -> \dice -> Dice.roll x dice
+            updateDiceRolled result model
 
-                newDiceset =
-                    Array.toList model.diceset
-                        |> List.map2 mapper result
-                        |> Array.fromList
-            in
-            ( { model | diceset = newDiceset }, Cmd.none )
+        EntryClicked name ->
+            updateEntryClicked name model
 
 
 
@@ -164,9 +195,41 @@ createDiceListHtml diceset =
 --Attributes.style
 
 
+getEntryValue : Int -> String
+getEntryValue value =
+    if value < 0 then
+        " "
+
+    else
+        String.fromInt value
+
+
+createEntriesRowHtml : Entry -> Html Msg
+createEntriesRowHtml entry =
+    Html.tr
+        [ Events.onClick (EntryClicked entry.name)
+        ]
+        [ Html.td [] [ Html.text (entry.name ++ ":") ]
+        , Html.td [] [ Html.text (getEntryValue entry.value) ]
+        ]
+
+
 createEntriesHtml : List Entry -> Html Msg
 createEntriesHtml entries =
-    Html.table [] []
+    entries
+        |> List.map createEntriesRowHtml
+        |> Html.table []
+
+
+buttonRollHtml : Html Msg
+buttonRollHtml =
+    Html.button
+        [ Events.onClick ButtonRollClicked
+        , Attributes.style "clear" "both"
+        , Attributes.style "display" "block"
+        ]
+        [ Html.text "Roll!"
+        ]
 
 
 view : Model -> Html Msg
@@ -174,13 +237,7 @@ view model =
     Html.div
         [ Attributes.id "main" ]
         [ createDiceListHtml model.diceset
-        , Html.button
-            [ Events.onClick ButtonRollClicked
-            , Attributes.style "clear" "both"
-            , Attributes.style "display" "block"
-            ]
-            [ Html.text "Roll!"
-            ]
+        , buttonRollHtml
         , createEntriesHtml model.entries
         ]
 
