@@ -34,7 +34,6 @@ type alias Entry =
 type alias Model =
     { diceset : Diceset
     , entries : List Entry
-    , sums : List Entry
     }
 
 
@@ -76,7 +75,6 @@ init _ =
     ( Model
         (initDiceset [ 1, 1, 1, 1, 1 ])
         initEntries
-        []
     , Cmd.none
     )
 
@@ -237,6 +235,56 @@ buttonRollHtml =
         ]
 
 
+createSumsHtml : List Entry -> Html Msg
+createSumsHtml entries =
+    let
+        names =
+            [ "Ones", "Twos", "Threes", "Fours", "Fives", "Six" ]
+
+        folder entry reducer =
+            if List.member entry.name names then
+                if entry.entered then
+                    { reducer | upper = reducer.upper + entry.value }
+
+                else
+                    reducer
+
+            else if entry.entered then
+                { reducer | lower = reducer.lower + entry.value }
+
+            else
+                reducer
+
+        sums =
+            List.foldl folder { upper = 0, lower = 0 } entries
+
+        getBonus upper =
+            if upper >= 63 then
+                35
+
+            else
+                0
+    in
+    Html.table []
+        [ Html.tr []
+            [ Html.td [] [ Html.text "Sum Upper Part:" ]
+            , Html.td [] [ Html.text (String.fromInt sums.upper) ]
+            ]
+        , Html.tr []
+            [ Html.td [] [ Html.text "Bonus:" ]
+            , Html.td [] [ Html.text (String.fromInt (getBonus sums.upper)) ]
+            ]
+        , Html.tr []
+            [ Html.td [] [ Html.text "Sum Lower Part:" ]
+            , Html.td [] [ Html.text (String.fromInt sums.lower) ]
+            ]
+        , Html.tr []
+            [ Html.td [] [ Html.text "Sum All:" ]
+            , Html.td [] [ Html.text (String.fromInt (sums.upper + sums.lower + getBonus sums.upper)) ]
+            ]
+        ]
+
+
 view : Model -> Html Msg
 view model =
     Html.div
@@ -244,6 +292,7 @@ view model =
         [ createDiceListHtml model.diceset
         , buttonRollHtml
         , createEntriesHtml model.entries
+        , createSumsHtml model.entries
         ]
 
 
