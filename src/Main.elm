@@ -76,6 +76,7 @@ init _ =
     ( Model
         (initDiceset [ 1, 1, 1, 1, 1 ])
         initEntries
+        []
     , Cmd.none
     )
 
@@ -85,10 +86,10 @@ init _ =
 
 
 type Msg
-    = DiceClicked Int
-    | ButtonRollClicked
+    = HoldDice Int
+    | RollDice
     | DiceRolled (List Int)
-    | EntryClicked String
+    | EnterValue String
 
 
 rollDiceset : Random.Generator (List Int)
@@ -97,8 +98,8 @@ rollDiceset =
         |> Random.list 6
 
 
-updateDiceClicked : Int -> Model -> ( Model, Cmd Msg )
-updateDiceClicked index model =
+updateHoldDice : Int -> Model -> ( Model, Cmd Msg )
+updateHoldDice index model =
     let
         mapper i dice =
             if i == index then
@@ -127,8 +128,8 @@ updateDiceRolled result model =
     ( { model | diceset = newDiceset }, Cmd.none )
 
 
-updateEntryClicked : String -> Model -> ( Model, Cmd Msg )
-updateEntryClicked name model =
+updateEnterValue : String -> Model -> ( Model, Cmd Msg )
+updateEnterValue name model =
     let
         mapper entry =
             if entry.name == name then
@@ -146,17 +147,17 @@ updateEntryClicked name model =
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
-        DiceClicked index ->
-            updateDiceClicked index model
+        HoldDice index ->
+            updateHoldDice index model
 
-        ButtonRollClicked ->
+        RollDice ->
             ( model, Random.generate DiceRolled rollDiceset )
 
         DiceRolled result ->
             updateDiceRolled result model
 
-        EntryClicked name ->
-            updateEntryClicked name model
+        EnterValue name ->
+            updateEnterValue name model
 
 
 
@@ -181,7 +182,7 @@ createListItemHtml index dice =
             getDiceWidth 100 dice.held
     in
     Html.li
-        [ Events.onClick (DiceClicked index)
+        [ Events.onClick (HoldDice index)
         , Attributes.style "float" "left"
         ]
         [ Dice.toSVG width dice
@@ -212,7 +213,7 @@ getEntryValue value =
 createEntriesRowHtml : Entry -> Html Msg
 createEntriesRowHtml entry =
     Html.tr
-        [ Events.onClick (EntryClicked entry.name)
+        [ Events.onClick (EnterValue entry.name)
         ]
         [ Html.td [] [ Html.text (entry.name ++ ":") ]
         , Html.td [] [ Html.text (getEntryValue entry.value) ]
@@ -229,7 +230,7 @@ createEntriesHtml entries =
 buttonRollHtml : Html Msg
 buttonRollHtml =
     Html.button
-        [ Events.onClick ButtonRollClicked
+        [ Events.onClick RollDice
         , Attributes.style "clear" "both"
         , Attributes.style "display" "block"
         ]
