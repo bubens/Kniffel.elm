@@ -89,7 +89,7 @@ type Msg
     = HoldDice Int
     | RollDice
     | DiceRolled (List Int)
-    | EnterValue String
+    | EnterValue Entry
 
 
 rollDiceset : Random.Generator (List Int)
@@ -128,15 +128,18 @@ updateDiceRolled result model =
     ( { model | diceset = newDiceset }, Cmd.none )
 
 
-updateEnterValue : String -> Model -> ( Model, Cmd Msg )
-updateEnterValue name model =
+updateEnterValue : Entry -> Model -> ( Model, Cmd Msg )
+updateEnterValue entry model =
     let
-        mapper entry =
-            if entry.name == name then
-                initEntry entry.name entry.entryType 999 True
+        name =
+            entry.name
+
+        mapper e =
+            if e.name == name then
+                initEntry e.name e.entryType 999 True
 
             else
-                entry
+                e
 
         newEntries =
             List.map mapper model.entries
@@ -156,8 +159,8 @@ update msg model =
         DiceRolled result ->
             updateDiceRolled result model
 
-        EnterValue name ->
-            updateEnterValue name model
+        EnterValue entry ->
+            updateEnterValue entry model
 
 
 
@@ -197,10 +200,6 @@ createDiceListHtml diceset =
         |> Html.ul [ Attributes.style "list-style" "none" ]
 
 
-
---Attributes.style
-
-
 getEntryValue : Int -> String
 getEntryValue value =
     if value < 0 then
@@ -213,7 +212,7 @@ getEntryValue value =
 createEntriesRowHtml : Entry -> Html Msg
 createEntriesRowHtml entry =
     Html.tr
-        [ Events.onClick (EnterValue entry.name)
+        [ Events.onClick (EnterValue entry)
         ]
         [ Html.td [] [ Html.text (entry.name ++ ":") ]
         , Html.td [] [ Html.text (getEntryValue entry.value) ]
