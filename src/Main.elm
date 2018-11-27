@@ -34,6 +34,7 @@ type alias Entry =
 type alias Model =
     { diceset : Diceset
     , entries : List Entry
+    , sums : List Entry
     }
 
 
@@ -99,14 +100,12 @@ rollDiceset =
 updateDiceClicked : Int -> Model -> ( Model, Cmd Msg )
 updateDiceClicked index model =
     let
-        mapper =
-            \i ->
-                \dice ->
-                    if i == index then
-                        Dice.hold (not dice.held) dice
+        mapper i dice =
+            if i == index then
+                Dice.hold (not dice.held) dice
 
-                    else
-                        dice
+            else
+                dice
 
         newDiceset =
             Array.indexedMap mapper model.diceset
@@ -117,8 +116,8 @@ updateDiceClicked index model =
 updateDiceRolled : List Int -> Model -> ( Model, Cmd Msg )
 updateDiceRolled result model =
     let
-        mapper =
-            \x -> \dice -> Dice.roll x dice
+        mapper x dice =
+            Dice.roll x dice
 
         newDiceset =
             Array.toList model.diceset
@@ -131,13 +130,12 @@ updateDiceRolled result model =
 updateEntryClicked : String -> Model -> ( Model, Cmd Msg )
 updateEntryClicked name model =
     let
-        mapper =
-            \entry ->
-                if entry.name == name then
-                    initEntry entry.name entry.entryType 999 True
+        mapper entry =
+            if entry.name == name then
+                initEntry entry.name entry.entryType 999 True
 
-                else
-                    entry
+            else
+                entry
 
         newEntries =
             List.map mapper model.entries
