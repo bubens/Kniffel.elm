@@ -167,17 +167,21 @@ updateEnterValue entry model =
         value =
             getValue entry model
 
-        mapper e =
-            if e.name == name then
-                initEntry e.name e.entryType value True
+        mapper ent =
+            if ent.name == name then
+                initEntry ent.name ent.entryType value True
 
             else
-                e
+                ent
 
         newEntries =
             List.map mapper model.entries
     in
-    ( { model | entries = newEntries }, Cmd.none )
+    if not entry.entered then
+        ( { model | entries = newEntries }, Cmd.none )
+
+    else
+        ( model, Cmd.none )
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
