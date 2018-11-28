@@ -90,6 +90,38 @@ type Msg
     | EnterValue Entry
 
 
+getDicesetAsInts : Diceset -> List Int
+getDicesetAsInts diceset =
+    diceset
+        |> Array.toList
+        |> List.map .face
+
+
+getSum : Int -> List Int -> Int
+getSum face faces =
+    if face == 0 then
+        List.foldl (+) 0 faces
+
+    else
+        faces
+            |> List.filter (\x -> x == face)
+            |> List.foldl (+) 0
+
+
+getValue : Entry -> Model -> Int
+getValue entry model =
+    let
+        faces =
+            getDicesetAsInts model.diceset
+    in
+    case entry.entryType of
+        Sum face ->
+            getSum face faces
+
+        Predefined value ->
+            value
+
+
 rollDiceset : Random.Generator (List Int)
 rollDiceset =
     Random.int 1 6
@@ -132,9 +164,12 @@ updateEnterValue entry model =
         name =
             entry.name
 
+        value =
+            getValue entry model
+
         mapper e =
             if e.name == name then
-                initEntry e.name e.entryType 999 True
+                initEntry e.name e.entryType value True
 
             else
                 e
