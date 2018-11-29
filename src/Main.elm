@@ -31,9 +31,15 @@ type alias Entry =
     }
 
 
+type alias Controls =
+    { countRolls : Int
+    }
+
+
 type alias Model =
     { diceset : Diceset
     , entries : List Entry
+    , controls : Controls
     }
 
 
@@ -70,11 +76,18 @@ initEntries =
     ]
 
 
+initControls : Controls
+initControls =
+    { countRolls = 0
+    }
+
+
 init : () -> ( Model, Cmd Msg )
 init _ =
     ( Model
         (initDiceset [ 1, 1, 1, 1, 1 ])
         initEntries
+        initControls
     , Cmd.none
     )
 
@@ -184,6 +197,21 @@ updateEnterValue entry model =
         model
 
 
+incrementRollCounter : Model -> Model
+incrementRollCounter model =
+    let
+        curControls =
+            model.controls
+
+        curCounter =
+            curControls.countRolls
+
+        newControls =
+            { curControls | countRolls = curCounter + 1 }
+    in
+    { model | controls = newControls }
+
+
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
@@ -191,7 +219,11 @@ update msg model =
             ( updateHoldDice index model, Cmd.none )
 
         RollDice ->
-            ( model, Random.generate DiceRolled rollDiceset )
+            if model.controls.countRolls < 3 then
+                ( incrementRollCounter model, Random.generate DiceRolled rollDiceset )
+
+            else
+                ( model, Cmd.none )
 
         DiceRolled result ->
             ( updateDiceRolled result model, Cmd.none )
@@ -234,7 +266,10 @@ createDiceListHtml diceset =
     diceset
         |> Array.indexedMap createListItemHtml
         |> Array.toList
-        |> Html.ul [ Attributes.style "list-style" "none" ]
+        |> Html.ul
+            [ Attributes.style "list-style" "none"
+            , Attributes.style "clear" "both"
+            ]
 
 
 getEntryValue : Int -> String
@@ -251,8 +286,8 @@ createEntriesRowHtml entry =
     Html.tr
         [ Events.onClick (EnterValue entry)
         ]
-        [ Html.td [] [ Html.text (entry.name ++ ":") ]
-        , Html.td [] [ Html.text (getEntryValue entry.value) ]
+        [ Html.td [] [ Html.text <| entry.name ++ ":" ]
+        , Html.td [] [ Html.text <| getEntryValue entry.value ]
         ]
 
 
@@ -263,12 +298,25 @@ createEntriesHtml entries =
         |> Html.table []
 
 
-buttonRollHtml : Html Msg
-buttonRollHtml =
+createRollCounterHtml : Controls -> Html Msg
+createRollCounterHtml controls =
+    Html.div
+        [ Attributes.style "clear" "both"
+        ]
+        [ Html.text <| "Rolls: " ++ String.fromInt controls.countRolls ]
+
+
+createButtonRollHtml : Controls -> Html Msg
+createButtonRollHtml controls =
+    let
+        isDisabled =
+            controls.countRolls == 3
+    in
     Html.button
         [ Events.onClick RollDice
         , Attributes.style "clear" "both"
         , Attributes.style "display" "block"
+        , Attributes.disabled isDisabled
         ]
         [ Html.text "Roll!"
         ]
@@ -329,7 +377,8 @@ view model =
     Html.div
         [ Attributes.id "main" ]
         [ createDiceListHtml model.diceset
-        , buttonRollHtml
+        , createRollCounterHtml model.controls
+        , createButtonRollHtml model.controls
         , createEntriesHtml model.entries
         , createSumsHtml model.entries
         ]
