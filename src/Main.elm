@@ -128,7 +128,7 @@ rollDiceset =
         |> Random.list 6
 
 
-updateHoldDice : Int -> Model -> ( Model, Cmd Msg )
+updateHoldDice : Int -> Model -> Model
 updateHoldDice index model =
     let
         mapper i dice =
@@ -141,10 +141,10 @@ updateHoldDice index model =
         newDiceset =
             Array.indexedMap mapper model.diceset
     in
-    ( { model | diceset = newDiceset }, Cmd.none )
+    { model | diceset = newDiceset }
 
 
-updateDiceRolled : List Int -> Model -> ( Model, Cmd Msg )
+updateDiceRolled : List Int -> Model -> Model
 updateDiceRolled result model =
     let
         mapper x dice =
@@ -155,10 +155,10 @@ updateDiceRolled result model =
                 |> List.map2 mapper result
                 |> Array.fromList
     in
-    ( { model | diceset = newDiceset }, Cmd.none )
+    { model | diceset = newDiceset }
 
 
-updateEnterValue : Entry -> Model -> ( Model, Cmd Msg )
+updateEnterValue : Entry -> Model -> Model
 updateEnterValue entry model =
     let
         name =
@@ -178,26 +178,26 @@ updateEnterValue entry model =
             List.map mapper model.entries
     in
     if not entry.entered then
-        ( { model | entries = newEntries }, Cmd.none )
+        { model | entries = newEntries }
 
     else
-        ( model, Cmd.none )
+        model
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
         HoldDice index ->
-            updateHoldDice index model
+            ( updateHoldDice index model, Cmd.none )
 
         RollDice ->
             ( model, Random.generate DiceRolled rollDiceset )
 
         DiceRolled result ->
-            updateDiceRolled result model
+            ( updateDiceRolled result model, Cmd.none )
 
         EnterValue entry ->
-            updateEnterValue entry model
+            ( updateEnterValue entry model, Cmd.none )
 
 
 
