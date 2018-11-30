@@ -33,6 +33,7 @@ type alias Entry =
 
 type alias Controls =
     { countRolls : Int
+    , valueEntered : Bool
     }
 
 
@@ -79,6 +80,7 @@ initEntries =
 initControls : Controls
 initControls =
     { countRolls = 0
+    , valueEntered = False
     }
 
 
@@ -212,6 +214,18 @@ incrementRollCounter model =
     { model | controls = newControls }
 
 
+toggleValueEntered : Bool -> Model -> Model
+toggleValueEntered flag model =
+    let
+        curControls =
+            model.controls
+
+        newControls =
+            { curControls | valueEntered = flag }
+    in
+    { model | controls = newControls }
+
+
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
@@ -231,8 +245,13 @@ update msg model =
                 |> Tuple.mapFirst (updateDiceRolled result)
 
         EnterValue entry ->
-            ( model, Cmd.none )
-                |> Tuple.mapFirst (updateEnterValue entry)
+            if model.controls.valueEntered == False then
+                ( model, Cmd.none )
+                    |> Tuple.mapFirst (updateEnterValue entry)
+                    |> Tuple.mapFirst (toggleValueEntered True)
+
+            else
+                ( model, Cmd.none )
 
 
 
