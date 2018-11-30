@@ -216,7 +216,8 @@ update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
         HoldDice index ->
-            ( updateHoldDice index model, Cmd.none )
+            ( model, Cmd.none )
+                |> Tuple.mapFirst (updateHoldDice index)
 
         RollDice ->
             if model.controls.countRolls < 3 then
@@ -226,10 +227,12 @@ update msg model =
                 ( model, Cmd.none )
 
         DiceRolled result ->
-            ( updateDiceRolled result model, Cmd.none )
+            ( model, Cmd.none )
+                |> Tuple.mapFirst (updateDiceRolled result)
 
         EnterValue entry ->
-            ( updateEnterValue entry model, Cmd.none )
+            ( model, Cmd.none )
+                |> Tuple.mapFirst (updateEnterValue entry)
 
 
 
