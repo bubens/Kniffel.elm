@@ -226,6 +226,15 @@ toggleValueEntered flag model =
     { model | controls = newControls }
 
 
+ifThen : Bool -> (a -> b -> b) -> a -> b -> b
+ifThen condition map mapper mappee =
+    if condition then
+        map mapper mappee
+
+    else
+        mappee
+
+
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
@@ -234,21 +243,22 @@ update msg model =
                 |> Tuple.mapFirst (updateHoldDice index)
 
         RollDice ->
-            if model.controls.countRolls < 3 then
-                ( incrementRollCounter model, Random.generate DiceRolled rollDiceset )
-
-            else
-                ( model, Cmd.none )
+            ( model, Cmd.none )
+                |> ifThen (model.controls.countRolls < 3)
+                    Tuple.mapFirst incrementRollCounter
+                |> ifThen (model.controls.countRolls < 3)
+                    Tuple.mapSecond (\_ -> Random.generate DiceRolled rollDiceset)
 
         DiceRolled result ->
             ( model, Cmd.none )
                 |> Tuple.mapFirst (updateDiceRolled result)
 
         EnterValue entry ->
-            if model.controls.valueEntered == False then
-                ( model, Cmd.none )
-                    |> Tuple.mapFirst (updateEnterValue entry)
-                    |> Tuple.mapFirst (toggleValueEntered True)
+            ( model, Cmd.none )
+                |> ifThen (model.controls.valueEntered == False)
+                    Tuple.mapFirst (updateEnterValue entry)
+                |> ifThen (model.controls.valueEntered == False)
+                    Tuple.mapFirst (toggleValueEntered True)
 
             else
                 ( model, Cmd.none )
