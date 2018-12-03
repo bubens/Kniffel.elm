@@ -18,14 +18,15 @@ type alias Diceset =
     Array Dice
 
 
-type EntryType
-    = Sum Int
+type SumType
+    = SumAll
+    | SumValue Int
     | Predefined Int
 
 
 type alias Entry =
     { name : String
-    , entryType : EntryType
+    , sumType : SumType
     , value : Int
     , entered : Bool
     }
@@ -48,7 +49,7 @@ type alias Model =
 -- INIT
 
 
-initEntry : String -> EntryType -> Int -> Bool -> Entry
+initEntry : String -> SumType -> Int -> Bool -> Entry
 initEntry name type_ value held =
     Entry name type_ value held
 
@@ -61,19 +62,19 @@ initDiceset initvals =
 
 initEntries : List Entry
 initEntries =
-    [ initEntry "Ones" (Sum 1) -1 False
-    , initEntry "Twos" (Sum 2) -1 False
-    , initEntry "Threes" (Sum 3) -1 False
-    , initEntry "Fours" (Sum 4) -1 False
-    , initEntry "Fives" (Sum 5) -1 False
-    , initEntry "Six" (Sum 6) -1 False
-    , initEntry "All 3" (Sum 0) -1 False
-    , initEntry "All 4" (Sum 0) -1 False
+    [ initEntry "Ones" (SumValue 1) -1 False
+    , initEntry "Twos" (SumValue 2) -1 False
+    , initEntry "Threes" (SumValue 3) -1 False
+    , initEntry "Fours" (SumValue 4) -1 False
+    , initEntry "Fives" (SumValue 5) -1 False
+    , initEntry "Six" (SumValue 6) -1 False
+    , initEntry "All 3" SumAll -1 False
+    , initEntry "All 4" SumAll -1 False
     , initEntry "Full House" (Predefined 35) -1 False
     , initEntry "Small Straight" (Predefined 30) -1 False
     , initEntry "Large Straight" (Predefined 40) -1 False
     , initEntry "Yahtzee" (Predefined 50) -1 False
-    , initEntry "Chance" (Sum 0) -1 False
+    , initEntry "Chance" SumAll -1 False
     ]
 
 
@@ -112,15 +113,11 @@ getDicesetAsInts diceset =
         |> List.map .face
 
 
-getSum : Int -> List Int -> Int
-getSum face faces =
-    if face == 0 then
-        List.foldl (+) 0 faces
-
-    else
-        faces
-            |> List.filter (\x -> x == face)
-            |> List.foldl (+) 0
+getSumOfValue : Int -> List Int -> Int
+getSumOfValue value faces =
+    faces
+        |> List.filter (\x -> x == value)
+        |> List.foldl (+) 0
 
 
 getValue : Entry -> Model -> Int
@@ -129,9 +126,12 @@ getValue entry model =
         faces =
             getDicesetAsInts model.diceset
     in
-    case entry.entryType of
-        Sum face ->
-            getSum face faces
+    case entry.sumType of
+        SumValue face ->
+            getSumOfValue face faces
+
+        SumAll ->
+            List.foldl (+) 0 faces
 
         Predefined value ->
             value
@@ -184,7 +184,7 @@ updateEnterValue entry model =
 
         mapper ent =
             if ent.name == name then
-                initEntry ent.name ent.entryType value True
+                initEntry ent.name ent.sumType value True
 
             else
                 ent
@@ -227,12 +227,12 @@ toggleValueEntered flag model =
 
 
 ifThen : Bool -> (a -> b -> b) -> a -> b -> b
-ifThen condition map mapper mappee =
+ifThen condition map mapper mapee =
     if condition then
-        map mapper mappee
+        map mapper mapee
 
     else
-        mappee
+        mapee
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -245,9 +245,11 @@ update msg model =
         RollDice ->
             ( model, Cmd.none )
                 |> ifThen (model.controls.countRolls < 3)
-                    Tuple.mapFirst incrementRollCounter
+                    Tuple.mapFirst
+                    incrementRollCounter
                 |> ifThen (model.controls.countRolls < 3)
-                    Tuple.mapSecond (\_ -> Random.generate DiceRolled rollDiceset)
+                    Tuple.mapSecond
+                    (\_ -> Random.generate DiceRolled rollDiceset)
 
         DiceRolled result ->
             ( model, Cmd.none )
@@ -256,12 +258,11 @@ update msg model =
         EnterValue entry ->
             ( model, Cmd.none )
                 |> ifThen (model.controls.valueEntered == False)
-                    Tuple.mapFirst (updateEnterValue entry)
+                    Tuple.mapFirst
+                    (updateEnterValue entry)
                 |> ifThen (model.controls.valueEntered == False)
-                    Tuple.mapFirst (toggleValueEntered True)
-
-            else
-                ( model, Cmd.none )
+                    Tuple.mapFirst
+                    (toggleValueEntered True)
 
 
 
