@@ -184,7 +184,7 @@ updateEnterValue entry model =
 
         mapper ent =
             if ent.name == name then
-                initEntry ent.name ent.sumType value True
+                { ent | value = value, entered = True }
 
             else
                 ent
