@@ -1,6 +1,7 @@
 module Main exposing (Diceset, Model, Msg(..), createDiceListHtml, createListItemHtml, init, main, rollDiceset, subscriptions, update, view)
 
 import Array exposing (Array)
+import Array.Extra as Array
 import Browser
 import Debug
 import Dice exposing (Dice)
@@ -31,6 +32,7 @@ type alias Entry =
     , sumType : SumType
     , value : Int
     , entered : Bool
+    , rule : Diceset -> Bool
     }
 
 
@@ -51,7 +53,7 @@ type alias Model =
 -- INIT
 
 
-initEntry : String -> SumType -> Int -> Bool -> Entry
+initEntry : String -> SumType -> Int -> Bool -> (Diceset -> Bool) -> Entry
 initEntry name type_ value held =
     Entry name type_ value held
 
@@ -63,19 +65,19 @@ initDiceset =
 
 initEntries : List Entry
 initEntries =
-    [ initEntry "Ones" (SumValue 1) -1 False
-    , initEntry "Twos" (SumValue 2) -1 False
-    , initEntry "Threes" (SumValue 3) -1 False
-    , initEntry "Fours" (SumValue 4) -1 False
-    , initEntry "Fives" (SumValue 5) -1 False
-    , initEntry "Six" (SumValue 6) -1 False
-    , initEntry "All 3" SumAll -1 False
-    , initEntry "All 4" SumAll -1 False
-    , initEntry "Full House" (Predefined 35) -1 False
-    , initEntry "Small Straight" (Predefined 30) -1 False
-    , initEntry "Large Straight" (Predefined 40) -1 False
-    , initEntry "Yahtzee" (Predefined 50) -1 False
-    , initEntry "Chance" SumAll -1 False
+    [ initEntry "Ones" (SumValue 1) -1 False isAlwaysTrue
+    , initEntry "Twos" (SumValue 2) -1 False isAlwaysTrue
+    , initEntry "Threes" (SumValue 3) -1 False isAlwaysTrue
+    , initEntry "Fours" (SumValue 4) -1 False isAlwaysTrue
+    , initEntry "Fives" (SumValue 5) -1 False isAlwaysTrue
+    , initEntry "Six" (SumValue 6) -1 False isAlwaysTrue
+    , initEntry "All 3" SumAll -1 False isTriple
+    , initEntry "All 4" SumAll -1 False isQuadruple
+    , initEntry "Full House" (Predefined 35) -1 False isFullHouse
+    , initEntry "Small Straight" (Predefined 30) -1 False isSmallStraight
+    , initEntry "Large Straight" (Predefined 40) -1 False isLargeStraight
+    , initEntry "Yahtzee" (Predefined 50) -1 False isYahtzee
+    , initEntry "Chance" SumAll -1 False isAlwaysTrue
     ]
 
 
@@ -105,6 +107,69 @@ type Msg
     | RollDice
     | DiceRolled (List Dice.Face)
     | EnterValue Entry
+    | NextRound
+
+
+isAlwaysTrue : Diceset -> Bool
+isAlwaysTrue diceset =
+    True
+
+
+countFaces : Diceset -> List Int
+countFaces diceset =
+    let
+        counter =
+            \x ->
+                \array ->
+                    Array.update x ((+) 1) array
+    in
+    getDicesetAsInts diceset
+        |> List.foldl counter (Array.repeat 6 0)
+        |> Array.toList
+
+
+hasNEqualFaces : Int -> Diceset -> Bool
+hasNEqualFaces n diceset =
+    countFaces diceset
+        |> List.member n
+
+
+isFullHouse : Diceset -> Bool
+isFullHouse diceset =
+    let
+        faces =
+            countFaces diceset
+    in
+    List.member 3 faces
+        && List.member 2 faces
+
+
+isTriple : Diceset -> Bool
+isTriple diceset =
+    diceset
+        |> hasNEqualFaces 3
+
+
+isQuadruple : Diceset -> Bool
+isQuadruple diceset =
+    diceset
+        |> hasNEqualFaces 4
+
+
+isYahtzee : Diceset -> Bool
+isYahtzee diceset =
+    diceset
+        |> hasNEqualFaces 5
+
+
+isSmallStraight : Diceset -> Bool
+isSmallStraight =
+    isAlwaysTrue
+
+
+isLargeStraight : Diceset -> Bool
+isLargeStraight =
+    isAlwaysTrue
 
 
 getDicesetAsInts : Diceset -> List Int
@@ -121,8 +186,8 @@ getSumOfValue value faces =
         |> List.foldl (+) 0
 
 
-getValue : Entry -> Model -> Int
-getValue entry model =
+getMaxPoints : Entry -> Model -> Int
+getMaxPoints entry model =
     let
         faces =
             getDicesetAsInts model.diceset
@@ -176,18 +241,22 @@ updateEnterValue entry model =
         name =
             entry.name
 
-        value =
-            getValue entry model
+        maxPoints =
+            getMaxPoints entry model
 
-        mapper ent =
-            if ent.name == name then
-                { ent | value = value, entered = True }
+        updateEntries thisEntry =
+            if thisEntry.name == name then
+                if thisEntry.rule model.diceset == True then
+                    { thisEntry | value = maxPoints, entered = True }
+
+                else
+                    { thisEntry | value = 0, entered = True }
 
             else
-                ent
+                thisEntry
 
         newEntries =
-            List.map mapper model.entries
+            List.map updateEntries model.entries
     in
     if not entry.entered then
         { model | entries = newEntries }
@@ -259,35 +328,12 @@ update msg model =
             else
                 ( model, Cmd.none )
 
+        NextRound ->
+            ( model, Cmd.none )
+
 
 
 -- VIEW
-{- }
-   type Msg
-       = HoldDice Int
-       | RollDice
-       | DiceRolled (List Dice.Face)
-       | EnterValue Entry
--}
-
-
-messageToString : Msg -> String
-messageToString msg =
-    case msg of
-        HoldDice x ->
-            "Hold dice Nr. " ++ String.fromInt x
-
-        RollDice ->
-            "Roll Dice"
-
-        DiceRolled list ->
-            list
-                |> List.map (\face -> Dice.create |> Dice.roll face)
-                |> List.map (\dice -> Dice.toString dice)
-                |> List.foldl (\s -> \a -> a ++ ", " ++ s) ""
-
-        EnterValue entry ->
-            entry.name
 
 
 onIngameClick : Msg -> Html.Attribute Msg
@@ -371,7 +417,7 @@ createButtonRollHtml : Controls -> Html Msg
 createButtonRollHtml controls =
     let
         isDisabled =
-            controls.countRolls == 3
+            controls.countRolls == 3 || controls.valueEntered
     in
     Html.button
         [ onIngameClick RollDice
@@ -380,6 +426,20 @@ createButtonRollHtml controls =
         , Attributes.disabled isDisabled
         ]
         [ Html.text "Roll!"
+        ]
+
+
+createButtonNextRoundHtml : Controls -> Html Msg
+createButtonNextRoundHtml controls =
+    let
+        isDisabled =
+            not controls.valueEntered
+    in
+    Html.button
+        [ onIngameClick NextRound
+        , Attributes.disabled isDisabled
+        ]
+        [ Html.text "Next!"
         ]
 
 
@@ -448,6 +508,7 @@ view model =
             [ Attributes.id "kniffel_main" ]
             [ createDiceListHtml model.diceset
             , createRollCounterHtml model.controls
+            , createButtonNextRoundHtml model.controls
             , createButtonRollHtml model.controls
             , createEntriesHtml model.entries
             , createSumsHtml model.entries
