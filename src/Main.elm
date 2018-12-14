@@ -2,10 +2,12 @@ module Main exposing (Diceset, Model, Msg(..), createDiceListHtml, createListIte
 
 import Array exposing (Array)
 import Browser
+import Debug
 import Dice exposing (Dice)
 import Html exposing (Html)
 import Html.Attributes as Attributes
 import Html.Events as Events
+import Json.Decode as Json
 import List
 import Random
 
@@ -54,10 +56,9 @@ initEntry name type_ value held =
     Entry name type_ value held
 
 
-initDiceset : List Int -> Diceset
-initDiceset initvals =
-    Array.fromList initvals
-        |> Array.map (\x -> Dice.create x)
+initDiceset : Diceset
+initDiceset =
+    Array.repeat 5 Dice.create
 
 
 initEntries : List Entry
@@ -88,7 +89,7 @@ initControls =
 init : () -> ( Model, Cmd Msg )
 init _ =
     ( Model
-        (initDiceset [ 1, 1, 1, 1, 1 ])
+        initDiceset
         initEntries
         initControls
     , Cmd.none
@@ -102,15 +103,15 @@ init _ =
 type Msg
     = HoldDice Int
     | RollDice
-    | DiceRolled (List Int)
+    | DiceRolled (List Dice.Face)
     | EnterValue Entry
 
 
 getDicesetAsInts : Diceset -> List Int
 getDicesetAsInts diceset =
     diceset
+        |> Array.map (\dice -> Dice.toInt dice)
         |> Array.toList
-        |> List.map .face
 
 
 getSumOfValue : Int -> List Int -> Int
@@ -137,10 +138,9 @@ getValue entry model =
             value
 
 
-rollDiceset : Random.Generator (List Int)
+rollDiceset : Random.Generator (List Dice.Face)
 rollDiceset =
-    Random.int 1 6
-        |> Random.list 6
+    Random.list 5 <| Dice.generateRandomFace
 
 
 updateHoldDice : Int -> Model -> Model
@@ -159,15 +159,12 @@ updateHoldDice index model =
     { model | diceset = newDiceset }
 
 
-updateDiceRolled : List Int -> Model -> Model
+updateDiceRolled : List Dice.Face -> Model -> Model
 updateDiceRolled result model =
     let
-        mapper x dice =
-            Dice.roll x dice
-
         newDiceset =
             Array.toList model.diceset
-                |> List.map2 mapper result
+                |> List.map2 (\face -> \dice -> Dice.roll face dice) result
                 |> Array.fromList
     in
     { model | diceset = newDiceset }
@@ -265,6 +262,39 @@ update msg model =
 
 
 -- VIEW
+{- }
+   type Msg
+       = HoldDice Int
+       | RollDice
+       | DiceRolled (List Dice.Face)
+       | EnterValue Entry
+-}
+
+
+messageToString : Msg -> String
+messageToString msg =
+    case msg of
+        HoldDice x ->
+            "Hold dice Nr. " ++ String.fromInt x
+
+        RollDice ->
+            "Roll Dice"
+
+        DiceRolled list ->
+            list
+                |> List.map (\face -> Dice.create |> Dice.roll face)
+                |> List.map (\dice -> Dice.toString dice)
+                |> List.foldl (\s -> \a -> a ++ ", " ++ s) ""
+
+        EnterValue entry ->
+            entry.name
+
+
+onIngameClick : Msg -> Html.Attribute Msg
+onIngameClick message =
+    Events.preventDefaultOn
+        "click"
+        (Json.map (\msg -> ( msg, True )) (Json.succeed message))
 
 
 getDiceWidth : Int -> Bool -> Int
@@ -285,10 +315,10 @@ createListItemHtml index dice =
             getDiceWidth 100 dice.held
     in
     Html.li
-        [ Events.onClick (HoldDice index)
+        [ onIngameClick (HoldDice index)
         , Attributes.style "float" "left"
         ]
-        [ Dice.toSVG width dice
+        [ Dice.toSvg width dice
         ]
 
 
@@ -315,7 +345,7 @@ getEntryValue value =
 createEntriesRowHtml : Entry -> Html Msg
 createEntriesRowHtml entry =
     Html.tr
-        [ Events.onClick (EnterValue entry)
+        [ onIngameClick (EnterValue entry)
         ]
         [ Html.td [] [ Html.text <| entry.name ++ ":" ]
         , Html.td [] [ Html.text <| getEntryValue entry.value ]
@@ -344,7 +374,7 @@ createButtonRollHtml controls =
             controls.countRolls == 3
     in
     Html.button
-        [ Events.onClick RollDice
+        [ onIngameClick RollDice
         , Attributes.style "clear" "both"
         , Attributes.style "display" "block"
         , Attributes.disabled isDisabled
@@ -403,16 +433,27 @@ createSumsHtml entries =
         ]
 
 
-view : Model -> Html Msg
+type alias Document msg =
+    { title : String
+    , body : List (Html msg)
+    }
+
+
+view : Model -> Document Msg
 view model =
-    Html.div
-        [ Attributes.id "main" ]
-        [ createDiceListHtml model.diceset
-        , createRollCounterHtml model.controls
-        , createButtonRollHtml model.controls
-        , createEntriesHtml model.entries
-        , createSumsHtml model.entries
+    { title = "Kniffel.elm"
+    , body =
+        [ Html.h1 [] [ Html.text "Kniffel.elm" ]
+        , Html.div
+            [ Attributes.id "kniffel_main" ]
+            [ createDiceListHtml model.diceset
+            , createRollCounterHtml model.controls
+            , createButtonRollHtml model.controls
+            , createEntriesHtml model.entries
+            , createSumsHtml model.entries
+            ]
         ]
+    }
 
 
 
@@ -429,7 +470,7 @@ subscriptions model =
 
 
 main =
-    Browser.element
+    Browser.document
         { init = init
         , view = view
         , update = update

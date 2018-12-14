@@ -1,8 +1,8 @@
 module Dice exposing
-    ( Dice
+    ( Dice, Face
     , create
-    , roll, hold
-    , toSVG
+    , roll, rollTo, hold, generateRandomFace, toInt, toString
+    , toSvg
     )
 
 {-| This module is a small helper to create, handle and visualize a Dice.
@@ -10,7 +10,7 @@ module Dice exposing
 
 # Definition
 
-@docs Dice
+@docs Dice, Face
 
 
 # Create
@@ -20,19 +20,33 @@ module Dice exposing
 
 # Handle
 
-@docs roll, hold
+@docs roll, rollTo, hold, generateRandomFace, toInt, toString
 
 
 # Visualize
 
-@docs toSVG
+@docs toSvg
 
 -}
 
 import Array
 import Html
+import Maybe
+import Random
 import Svg
 import Svg.Attributes as Attributes
+
+
+{-| Unitype for faces of a dice.
+Exported only to be used for type-decleration (e.g. Dice.generateRandomFace)
+-}
+type Face
+    = One
+    | Two
+    | Three
+    | Four
+    | Five
+    | Six
 
 
 {-| Definition of a Type Dice.
@@ -41,35 +55,51 @@ import Svg.Attributes as Attributes
 
 -}
 type alias Dice =
-    { face : Int
+    { face : Face
     , held : Bool
     }
+
+
+{-| Generator for random rolls.
+Generates a random face of the type Face.
+
+    update : Msg -> Model -> ( Model, Msg )
+    update msg model =
+        case msg of
+            RollDice ->
+                ( model, Random.generate DiceRolled generateRandomFace )
+
+            DiceRolled face ->
+                ( Dice.roll face, Cmd.none )
+
+-}
+generateRandomFace : Random.Generator Face
+generateRandomFace =
+    Random.uniform One [ Two, Three, Four, Five, Six ]
 
 
 {-| Create a Dice with a predefined face.
 A newly created Dice will not be held.
 
+    Dice.create
 
-    myDice =
-        Dice.create 1
-
-    -- -> { face = 1, held = False } : Dice.Dice
+    -- -> { face = None, held = False } : Dice.Dice
 
 -}
-create : Int -> Dice
-create initFace =
-    Dice initFace False
+create : Dice
+create =
+    Dice One False
 
 
 {-| Roll a dice.
 Will only if the dice is not currently held.
 
-    myDice = Dice.create 1
-    Dice.roll 3 myDice
-    -- -> { face = 3, held = False } : Dice.Dice
+    Dice.create
+        |> roll Two
+    -- -> { face = Dice.Two, held = False } : Dice.Dice
 
 -}
-roll : Int -> Dice -> Dice
+roll : Face -> Dice -> Dice
 roll newFace dice =
     if dice.held == False then
         { dice | face = newFace }
@@ -78,12 +108,46 @@ roll newFace dice =
         dice
 
 
+{-| Roll the dice to a certain face.
+Specify newFace by Int. Returns Nothing if newFace is not a valid face.
+
+    create
+        |> rollTo 2
+        |> Maybe.withDefault "Error"
+
+-}
+rollTo : Dice -> Int -> Maybe Dice
+rollTo dice newFace =
+    case newFace of
+        1 ->
+            Just (roll One dice)
+
+        2 ->
+            Just (roll Two dice)
+
+        3 ->
+            Just (roll Three dice)
+
+        4 ->
+            Just (roll Four dice)
+
+        5 ->
+            Just (roll Five dice)
+
+        6 ->
+            Just (roll Six dice)
+
+        _ ->
+            Nothing
+
+
 {-| Hold a dice.
 A held dice will not roll.
 
-    myDice = Dice.create 1
-    Dice.hold True myDice
-    -- -> { face = 3, held = True } : Dice.Dice
+    Dice.create
+        |> roll Six
+        |> hold True
+    -- -> { face = , held = True } : Dice.Dice
 
 -}
 hold : Bool -> Dice -> Dice
@@ -91,25 +155,160 @@ hold isHeld dice =
     { dice | held = isHeld }
 
 
-createDots : Int -> List Int -> List (Svg.Svg msg)
-createDots width dots =
+{-| Get dice as Int.
+Returns current face of dice as int.
+
+    Dice.create
+        |> roll Two
+        |> asInt
+    -- -> 2 : Int
+
+-}
+toInt : Dice -> Int
+toInt dice =
+    case dice.face of
+        One ->
+            1
+
+        Two ->
+            2
+
+        Three ->
+            3
+
+        Four ->
+            4
+
+        Five ->
+            5
+
+        Six ->
+            6
+
+
+{-| Get dice as String.
+Returns current face of dice as string.
+
+    Dice.create
+        |> roll Two
+        |> asInt
+    -- -> Two : String
+
+-}
+toString : Dice -> String
+toString dice =
+    case dice.face of
+        One ->
+            "One"
+
+        Two ->
+            "Two"
+
+        Three ->
+            "Three"
+
+        Four ->
+            "Four"
+
+        Five ->
+            "Five"
+
+        Six ->
+            "Six"
+
+
+{-| Get a visual representation of the dice as SVG
+
+    Dice.create
+        |> roll Four
+        |> toSvg
+    -- -> <internals> : Html msg
+
+-}
+toSvg : Int -> Dice -> Html.Html msg
+toSvg width dice =
+    getRequiredDots dice.face
+        |> createFaceSvg width dice.held
+
+
+
+{- getRequiredDots returns a list containing
+   the positions of the dots on a dice' face.
+   Like this:
+
+    0     1
+
+    2  3  4
+
+    5     6
+-}
+
+
+getRequiredDots : Face -> List Int
+getRequiredDots face =
+    case face of
+        One ->
+            [ 3 ]
+
+        Two ->
+            [ 5, 1 ]
+
+        Three ->
+            [ 5, 3, 1 ]
+
+        Four ->
+            [ 0, 1, 5, 6 ]
+
+        Five ->
+            [ 0, 1, 3, 5, 6 ]
+
+        Six ->
+            [ 0, 1, 2, 4, 5, 6 ]
+
+
+createFaceSvg : Int -> Bool -> List Int -> Html.Html msg
+createFaceSvg width held dots =
+    let
+        strWidth =
+            String.fromInt width
+    in
+    createDotsSvg width dots
+        |> (::)
+            (Svg.rect
+                [ Attributes.width strWidth
+                , Attributes.height strWidth
+                , Attributes.x "0"
+                , Attributes.y "0"
+                , Attributes.fill (getBgColor held)
+                ]
+                []
+            )
+        |> Svg.svg
+            [ Attributes.width strWidth
+            , Attributes.height strWidth
+            , Attributes.viewBox ("0 0 " ++ strWidth ++ " " ++ strWidth)
+            , Attributes.style "border: solid 1px #000000; border-radius: 10px"
+            ]
+
+
+createDotsSvg : Int -> List Int -> List (Svg.Svg msg)
+createDotsSvg width dots =
     dots
-        |> List.map (\x -> getCoords x)
+        |> List.map (\x -> getDotCoords x)
         |> List.map
             (\( pcx, pcy ) ->
                 let
-                    widthFloat =
+                    w =
                         toFloat width
 
                     x =
-                        String.fromInt (round (pcx * widthFloat))
+                        String.fromInt <| round <| (pcx * w)
 
-                    --
                     y =
-                        String.fromInt (round (pcy * widthFloat))
+                        String.fromInt <| round <| (pcy * w)
 
                     r =
-                        String.fromInt (round (widthFloat / 10))
+                        String.fromInt <| round <| (0.1 * w)
                 in
                 Svg.circle
                     [ Attributes.cx x
@@ -121,109 +320,38 @@ createDots width dots =
             )
 
 
-getBgColor : Dice -> String
-getBgColor dice =
-    if dice.held == True then
+getDotCoords : Int -> ( Float, Float )
+getDotCoords position =
+    case position of
+        0 ->
+            ( 0.2, 0.2 )
+
+        1 ->
+            ( 0.8, 0.2 )
+
+        2 ->
+            ( 0.2, 0.5 )
+
+        3 ->
+            ( 0.5, 0.5 )
+
+        4 ->
+            ( 0.8, 0.5 )
+
+        5 ->
+            ( 0.2, 0.8 )
+
+        6 ->
+            ( 0.8, 0.8 )
+
+        _ ->
+            ( 0.0, 0.0 )
+
+
+getBgColor : Bool -> String
+getBgColor held =
+    if held == True then
         "#787878"
 
     else
         "#FFFFFF"
-
-
-{-| Get a visual representation of the dice as SVG
-
-    model : Dice
-    model =
-        Dice.create 1
-
-    view : Model -> Html msg
-    view model =
-        Dice.toSVG model
-
--}
-toSVG : Int -> Dice -> Html.Html msg
-toSVG width dice =
-    let
-        widthString =
-            String.fromInt width
-
-        viewBoxString =
-            "0 0 " ++ widthString ++ " " ++ widthString
-
-        dots =
-            Array.get (dice.face - 1) requiredDots
-
-        backgroundColor =
-            getBgColor dice
-    in
-    case dots of
-        Just goodDots ->
-            createDots width goodDots
-                |> (::)
-                    (Svg.rect
-                        [ Attributes.width widthString
-                        , Attributes.height widthString
-                        , Attributes.x "0"
-                        , Attributes.y "0"
-                        , Attributes.fill (getBgColor dice)
-                        ]
-                        []
-                    )
-                |> Svg.svg
-                    [ Attributes.width widthString
-                    , Attributes.height widthString
-                    , Attributes.viewBox viewBoxString
-                    ]
-
-        Nothing ->
-            Svg.svg
-                [ Attributes.width widthString
-                , Attributes.height widthString
-                , Attributes.viewBox viewBoxString
-                ]
-                [ Svg.text_
-                    [ Attributes.x (String.fromInt (width // 4))
-                    , Attributes.y (String.fromInt (width // 4))
-                    , Attributes.fill "red"
-                    ]
-                    [ Svg.text "Error" ]
-                ]
-
-
-requiredDots : Array.Array (List Int)
-requiredDots =
-    Array.fromList
-        [ [ 3 ]
-        , [ 5, 1 ]
-        , [ 5, 3, 1 ]
-        , [ 0, 1, 5, 6 ]
-        , [ 0, 1, 3, 5, 6 ]
-        , [ 0, 1, 2, 4, 5, 6 ]
-        ]
-
-
-getCoords : Int -> ( Float, Float )
-getCoords position =
-    let
-        coords =
-            Array.get position dotCoords
-    in
-    case coords of
-        Just goodCoords ->
-            goodCoords
-
-        Nothing ->
-            getCoords 0
-
-
-dotCoords : Array.Array ( Float, Float )
-dotCoords =
-    Array.fromList
-        [ ( 0.2, 0.2 )
-        , ( 0.8, 0.2 )
-        , ( 0.2, 0.5 )
-        , ( 0.5, 0.5 )
-        , ( 0.8, 0.5 )
-        , ( 0.2, 0.8 )
-        , ( 0.8, 0.8 )
-        ]
