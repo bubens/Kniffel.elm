@@ -1,7 +1,6 @@
 module Main exposing (Diceset, Model, Msg(..), createDiceListHtml, createListItemHtml, init, main, rollDiceset, subscriptions, update, view)
 
 import Array exposing (Array)
-import Array.Extra as Array
 import Browser
 import Debug
 import Dice exposing (Dice)
@@ -11,6 +10,7 @@ import Html.Events as Events
 import Json.Decode as Json
 import List
 import Random
+import Rules
 
 
 
@@ -32,7 +32,7 @@ type alias Entry =
     , sumType : SumType
     , value : Int
     , entered : Bool
-    , rule : Diceset -> Bool
+    , rule : Rules.Rule
     }
 
 
@@ -53,7 +53,7 @@ type alias Model =
 -- INIT
 
 
-initEntry : String -> SumType -> Int -> Bool -> (Diceset -> Bool) -> Entry
+initEntry : String -> SumType -> Int -> Bool -> Rules.Rule -> Entry
 initEntry name type_ value held =
     Entry name type_ value held
 
@@ -65,19 +65,19 @@ initDiceset =
 
 initEntries : List Entry
 initEntries =
-    [ initEntry "Ones" (SumValue 1) -1 False isAlwaysTrue
-    , initEntry "Twos" (SumValue 2) -1 False isAlwaysTrue
-    , initEntry "Threes" (SumValue 3) -1 False isAlwaysTrue
-    , initEntry "Fours" (SumValue 4) -1 False isAlwaysTrue
-    , initEntry "Fives" (SumValue 5) -1 False isAlwaysTrue
-    , initEntry "Six" (SumValue 6) -1 False isAlwaysTrue
-    , initEntry "All 3" SumAll -1 False isTriple
-    , initEntry "All 4" SumAll -1 False isQuadruple
-    , initEntry "Full House" (Predefined 35) -1 False isFullHouse
-    , initEntry "Small Straight" (Predefined 30) -1 False isSmallStraight
-    , initEntry "Large Straight" (Predefined 40) -1 False isLargeStraight
-    , initEntry "Yahtzee" (Predefined 50) -1 False isYahtzee
-    , initEntry "Chance" SumAll -1 False isAlwaysTrue
+    [ initEntry "Ones" (SumValue 1) -1 False Rules.isAlwaysTrue
+    , initEntry "Twos" (SumValue 2) -1 False Rules.isAlwaysTrue
+    , initEntry "Threes" (SumValue 3) -1 False Rules.isAlwaysTrue
+    , initEntry "Fours" (SumValue 4) -1 False Rules.isAlwaysTrue
+    , initEntry "Fives" (SumValue 5) -1 False Rules.isAlwaysTrue
+    , initEntry "Six" (SumValue 6) -1 False Rules.isAlwaysTrue
+    , initEntry "All 3" SumAll -1 False Rules.isTriple
+    , initEntry "All 4" SumAll -1 False Rules.isQuadruple
+    , initEntry "Full House" (Predefined 35) -1 False Rules.isFullHouse
+    , initEntry "Small Straight" (Predefined 30) -1 False Rules.isSmallStraight
+    , initEntry "Large Straight" (Predefined 40) -1 False Rules.isLargeStraight
+    , initEntry "Yahtzee" (Predefined 50) -1 False Rules.isYahtzee
+    , initEntry "Chance" SumAll -1 False Rules.isAlwaysTrue
     ]
 
 
@@ -108,68 +108,6 @@ type Msg
     | DiceRolled (List Dice.Face)
     | EnterValue Entry
     | NextRound
-
-
-isAlwaysTrue : Diceset -> Bool
-isAlwaysTrue diceset =
-    True
-
-
-countFaces : Diceset -> List Int
-countFaces diceset =
-    let
-        counter =
-            \x ->
-                \array ->
-                    Array.update x ((+) 1) array
-    in
-    getDicesetAsInts diceset
-        |> List.foldl counter (Array.repeat 6 0)
-        |> Array.toList
-
-
-hasNEqualFaces : Int -> Diceset -> Bool
-hasNEqualFaces n diceset =
-    countFaces diceset
-        |> List.member n
-
-
-isFullHouse : Diceset -> Bool
-isFullHouse diceset =
-    let
-        faces =
-            countFaces diceset
-    in
-    List.member 3 faces
-        && List.member 2 faces
-
-
-isTriple : Diceset -> Bool
-isTriple diceset =
-    diceset
-        |> hasNEqualFaces 3
-
-
-isQuadruple : Diceset -> Bool
-isQuadruple diceset =
-    diceset
-        |> hasNEqualFaces 4
-
-
-isYahtzee : Diceset -> Bool
-isYahtzee diceset =
-    diceset
-        |> hasNEqualFaces 5
-
-
-isSmallStraight : Diceset -> Bool
-isSmallStraight =
-    isAlwaysTrue
-
-
-isLargeStraight : Diceset -> Bool
-isLargeStraight =
-    isAlwaysTrue
 
 
 getDicesetAsInts : Diceset -> List Int
