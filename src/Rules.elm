@@ -1,6 +1,5 @@
 module Rules exposing
     ( Rule
-    , isAlwaysTrue
     , isFourOfAKind
     , isFullHouse
     , isLargeStraight
@@ -22,8 +21,8 @@ type alias Rule =
     Diceset -> Bool
 
 
-getDicesetAsInts : Diceset -> List Int
-getDicesetAsInts diceset =
+asInts : Diceset -> List Int
+asInts diceset =
     diceset
         |> Array.map (\dice -> Dice.toInt dice)
         |> Array.toList
@@ -38,7 +37,8 @@ countEachFace diceset =
                 \array ->
                     Array.update (x - 1) ((+) 1) array
     in
-    getDicesetAsInts diceset
+    diceset
+        |> asInts
         |> List.foldl counter (Array.repeat 6 0)
         |> Array.toList
 
