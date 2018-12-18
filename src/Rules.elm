@@ -1,11 +1,11 @@
 module Rules exposing
     ( Rule
     , isAlwaysTrue
+    , isFourOfAKind
     , isFullHouse
     , isLargeStraight
-    , isQuadruple
     , isSmallStraight
-    , isTriple
+    , isThreeOfAKind
     , isYahtzee
     )
 
@@ -69,11 +69,6 @@ isStraightOfLength len diceset =
         |> String.contains (String.repeat len "+")
 
 
-isAlwaysTrue : Rule
-isAlwaysTrue diceset =
-    True
-
-
 isFullHouse : Rule
 isFullHouse diceset =
     diceset
@@ -81,14 +76,14 @@ isFullHouse diceset =
         |> (&&) (diceset |> hasNEqualFaces 2)
 
 
-isTriple : Rule
-isTriple diceset =
+isThreeOfAKind : Rule
+isThreeOfAKind diceset =
     diceset
         |> hasNEqualFaces 3
 
 
-isQuadruple : Rule
-isQuadruple diceset =
+isFourOfAKind : Rule
+isFourOfAKind diceset =
     diceset
         |> hasNEqualFaces 4
 

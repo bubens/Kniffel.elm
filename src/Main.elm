@@ -21,18 +21,32 @@ type alias Diceset =
     Array Dice
 
 
-type SumType
-    = SumAll
-    | SumValue Int
-    | Predefined Int
+type EntryName
+    = One
+    | Two
+    | Three
+    | Four
+    | Five
+    | Six
+    | ThreeOfAKind
+    | FourOfAKind
+    | FullHouse
+    | SmallStraight
+    | LargeStraight
+    | Yahtzee
+    | Chance
+
+
+type InSheet
+    = Upper
+    | Lower
 
 
 type alias Entry =
-    { name : String
-    , sumType : SumType
+    { name : EntryName
+    , inSheet : InSheet
     , value : Int
     , entered : Bool
-    , rule : Rules.Rule
     }
 
 
@@ -53,9 +67,9 @@ type alias Model =
 -- INIT
 
 
-initEntry : String -> SumType -> Int -> Bool -> Rules.Rule -> Entry
-initEntry name type_ value held =
-    Entry name type_ value held
+initEntry : EntryName -> InSheet -> Int -> Bool -> Entry
+initEntry name inSheet value held =
+    Entry name inSheet value held
 
 
 initDiceset : Diceset
@@ -65,19 +79,19 @@ initDiceset =
 
 initEntries : List Entry
 initEntries =
-    [ initEntry "Ones" (SumValue 1) -1 False Rules.isAlwaysTrue
-    , initEntry "Twos" (SumValue 2) -1 False Rules.isAlwaysTrue
-    , initEntry "Threes" (SumValue 3) -1 False Rules.isAlwaysTrue
-    , initEntry "Fours" (SumValue 4) -1 False Rules.isAlwaysTrue
-    , initEntry "Fives" (SumValue 5) -1 False Rules.isAlwaysTrue
-    , initEntry "Six" (SumValue 6) -1 False Rules.isAlwaysTrue
-    , initEntry "All 3" SumAll -1 False Rules.isTriple
-    , initEntry "All 4" SumAll -1 False Rules.isQuadruple
-    , initEntry "Full House" (Predefined 35) -1 False Rules.isFullHouse
-    , initEntry "Small Straight" (Predefined 30) -1 False Rules.isSmallStraight
-    , initEntry "Large Straight" (Predefined 40) -1 False Rules.isLargeStraight
-    , initEntry "Yahtzee" (Predefined 50) -1 False Rules.isYahtzee
-    , initEntry "Chance" SumAll -1 False Rules.isAlwaysTrue
+    [ initEntry One Upper -1 False
+    , initEntry Two Upper -1 False
+    , initEntry Three Upper -1 False
+    , initEntry Four Upper -1 False
+    , initEntry Five Upper -1 False
+    , initEntry Six Upper -1 False
+    , initEntry ThreeOfAKind Lower -1 False
+    , initEntry FourOfAKind Lower -1 False
+    , initEntry FullHouse Lower -1 False
+    , initEntry SmallStraight Lower -1 False
+    , initEntry LargeStraight Lower -1 False
+    , initEntry Yahtzee Lower -1 False
+    , initEntry Chance Lower -1 False
     ]
 
 
@@ -124,26 +138,10 @@ getSumOfValue value faces =
         |> List.foldl (+) 0
 
 
-getMaxPoints : Entry -> Model -> Int
-getMaxPoints entry model =
-    let
-        faces =
-            getDicesetAsInts model.diceset
-    in
-    case entry.sumType of
-        SumValue face ->
-            getSumOfValue face faces
-
-        SumAll ->
-            List.foldl (+) 0 faces
-
-        Predefined value ->
-            value
-
-
 rollDiceset : Random.Generator (List Dice.Face)
 rollDiceset =
-    Random.list 5 <| Dice.generateRandomFace
+    Dice.generateRandomFace
+        |> Random.list 5
 
 
 updateHoldDice : Int -> Model -> Model
@@ -173,22 +171,91 @@ updateDiceRolled result model =
     { model | diceset = newDiceset }
 
 
+sumUpFace : Int -> Diceset -> Int
+sumUpFace x diceset =
+    let
+        sumIfFace : Int -> Int -> Int
+        sumIfFace v a =
+            if v == x then
+                a + v
+
+            else
+                a
+    in
+    diceset
+        |> getDicesetAsInts
+        |> List.foldl sumIfFace 0
+
+
+sumUpAll : Diceset -> Int
+sumUpAll diceset =
+    diceset
+        |> getDicesetAsInts
+        |> List.sum
+
+
+applyRuleAndGetPoints : Int -> Rules.Rule -> Diceset -> Int
+applyRuleAndGetPoints default rule diceset =
+    if rule diceset then
+        default
+
+    else
+        0
+
+
+getEarnedPoints : Entry -> Diceset -> Int
+getEarnedPoints entry diceset =
+    case entry.name of
+        One ->
+            sumUpFace 1 diceset
+
+        Two ->
+            sumUpFace 2 diceset
+
+        Three ->
+            sumUpFace 3 diceset
+
+        Four ->
+            sumUpFace 4 diceset
+
+        Five ->
+            sumUpFace 5 diceset
+
+        Six ->
+            sumUpFace 6 diceset
+
+        ThreeOfAKind ->
+            applyRuleAndGetPoints (sumUpAll diceset) Rules.isThreeOfAKind diceset
+
+        FourOfAKind ->
+            applyRuleAndGetPoints (sumUpAll diceset) Rules.isFourOfAKind diceset
+
+        FullHouse ->
+            applyRuleAndGetPoints 25 Rules.isFullHouse diceset
+
+        SmallStraight ->
+            applyRuleAndGetPoints 30 Rules.isSmallStraight diceset
+
+        LargeStraight ->
+            applyRuleAndGetPoints 40 Rules.isLargeStraight diceset
+
+        Yahtzee ->
+            applyRuleAndGetPoints 50 Rules.isYahtzee diceset
+
+        Chance ->
+            sumUpAll diceset
+
+
 updateEnterValue : Entry -> Model -> Model
 updateEnterValue entry model =
     let
-        name =
-            entry.name
+        points =
+            getEarnedPoints entry model.diceset
 
-        maxPoints =
-            getMaxPoints entry model
-
+        updateEntries : Entry -> Entry
         updateEntries thisEntry =
-            if thisEntry.name == name then
-                if thisEntry.rule model.diceset == True then
-                    { thisEntry | value = maxPoints, entered = True }
-
-                else
-                    { thisEntry | value = 0, entered = True }
+            if thisEntry.name == entry.name then
+                { thisEntry | value = points, entered = True }
 
             else
                 thisEntry
@@ -232,6 +299,11 @@ toggleValueEntered flag model =
 
 toTupleWithCmd : Cmd Msg -> Model -> ( Model, Cmd Msg )
 toTupleWithCmd msg model =
+    ( model, msg )
+
+
+toTupleWithModel : Model -> Cmd Msg -> ( Model, Cmd Msg )
+toTupleWithModel model msg =
     ( model, msg )
 
 
@@ -326,13 +398,56 @@ getEntryValue value =
         String.fromInt value
 
 
+getEntryName : EntryName -> String
+getEntryName name =
+    case name of
+        One ->
+            "One"
+
+        Two ->
+            "Two"
+
+        Three ->
+            "Three"
+
+        Four ->
+            "Four"
+
+        Five ->
+            "Five"
+
+        Six ->
+            "Six"
+
+        ThreeOfAKind ->
+            "3 Of A Kind"
+
+        FourOfAKind ->
+            "4 Of A Kind"
+
+        FullHouse ->
+            "Full House"
+
+        SmallStraight ->
+            "Small Straight"
+
+        LargeStraight ->
+            "Large Straight"
+
+        Yahtzee ->
+            "Yahtzee"
+
+        Chance ->
+            "Chance"
+
+
 createEntriesRowHtml : Entry -> Html Msg
 createEntriesRowHtml entry =
     Html.tr
         [ onIngameClick (EnterValue entry)
         ]
-        [ Html.td [] [ Html.text <| entry.name ++ ":" ]
-        , Html.td [] [ Html.text <| getEntryValue entry.value ]
+        [ Html.td [] [ Html.text (getEntryName entry.name ++ ":") ]
+        , Html.td [] [ Html.text (getEntryValue entry.value) ]
         ]
 
 
@@ -379,6 +494,15 @@ createButtonNextRoundHtml controls =
         ]
         [ Html.text "Next!"
         ]
+
+
+
+{- }
+   createSumsHtml : List Entry -> Html Msg
+   createSumsHtml entries =
+       Html.div [] [ Html.text "Here be sums" ]
+
+-}
 
 
 createSumsHtml : List Entry -> Html Msg
