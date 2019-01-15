@@ -12,7 +12,8 @@
             "elm/json": "1.1.2",
             "elm/random": "1.0.0",
             "elm/svg": "1.0.1",
-            "elm-community/array-extra": "2.0.0"
+            "elm-community/array-extra": "2.0.0",
+            "mdgriffith/elm-ui": "1.1.0"
         },
         "indirect": {
             "elm/time": "1.0.0",

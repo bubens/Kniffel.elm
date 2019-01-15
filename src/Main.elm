@@ -1,16 +1,19 @@
-module Main exposing (Diceset, Model, Msg(..), createDiceListHtml, createListItemHtml, init, main, rollDiceset, subscriptions, update, view)
+module Main exposing (Diceset, Entry, EntryName(..), Model, Msg(..), Sheet, applyRuleAndGetPoints, getDiceWidth, getDicesetAsInts, getEarnedPoints, getSumOfValue, incrementRollCounter, init, initDiceset, initEntries, initEntry, leftOf, main, onIngameClick, rightOf, rollDiceset, subscriptions, sumUpAll, sumUpFace, toggleValueEntered, update, updateDiceRolled, updateEnterValue, updateHoldDice, view)
 
 import Array exposing (Array)
 import Browser
 import Debug
-import Dice exposing (Dice)
+import Dict exposing (Dict)
+import Element exposing (..)
+import Element.Border as Border
 import Html exposing (Html)
 import Html.Attributes as Attributes
 import Html.Events as Events
 import Json.Decode as Json
+import Kniffel.Dice as Dice exposing (Dice)
+import Kniffel.Rules as Rules
 import List
 import Random
-import Rules
 
 
 
@@ -22,7 +25,8 @@ type alias Diceset =
 
 
 type EntryName
-    = One
+    = Dummy
+    | One
     | Two
     | Three
     | Four
@@ -37,29 +41,23 @@ type EntryName
     | Chance
 
 
-type InSheet
-    = Upper
-    | Lower
-
-
 type alias Entry =
     { name : EntryName
-    , inSheet : InSheet
-    , value : Int
+    , label : String
+    , value : Maybe Int
     , entered : Bool
     }
 
 
-type alias Controls =
-    { countRolls : Int
-    , valueEntered : Bool
-    }
+type alias Sheet =
+    Dict String Entry
 
 
 type alias Model =
     { diceset : Diceset
-    , entries : List Entry
-    , controls : Controls
+    , sheet : Sheet
+    , countRolls : Int
+    , valueEntered : Bool
     }
 
 
@@ -67,9 +65,9 @@ type alias Model =
 -- INIT
 
 
-initEntry : EntryName -> InSheet -> Int -> Bool -> Entry
-initEntry name inSheet value held =
-    Entry name inSheet value held
+initEntry : EntryName -> String -> Maybe Int -> Bool -> Entry
+initEntry name value held =
+    Entry name value held
 
 
 initDiceset : Diceset
@@ -77,29 +75,24 @@ initDiceset =
     Array.repeat 5 Dice.create
 
 
-initEntries : List Entry
+initEntries : Sheet
 initEntries =
-    [ initEntry One Upper -1 False
-    , initEntry Two Upper -1 False
-    , initEntry Three Upper -1 False
-    , initEntry Four Upper -1 False
-    , initEntry Five Upper -1 False
-    , initEntry Six Upper -1 False
-    , initEntry ThreeOfAKind Lower -1 False
-    , initEntry FourOfAKind Lower -1 False
-    , initEntry FullHouse Lower -1 False
-    , initEntry SmallStraight Lower -1 False
-    , initEntry LargeStraight Lower -1 False
-    , initEntry Yahtzee Lower -1 False
-    , initEntry Chance Lower -1 False
-    ]
-
-
-initControls : Controls
-initControls =
-    { countRolls = 0
-    , valueEntered = False
-    }
+    Dict.fromList
+        [ ( "dummy", initEntry Dummy "Dummy" Nothing False )
+        , ( "ones", initEntry One "1er" Nothing False )
+        , ( "twos", initEntry Two "2er" Nothing False )
+        , ( "threes", initEntry Three "3er" Nothing False )
+        , ( "fours", initEntry Four "4er" Nothing False )
+        , ( "fives", initEntry Five "5er" Nothing False )
+        , ( "sixs", initEntry Six "6er" Nothing False )
+        , ( "threeOfAKind", initEntry ThreeOfAKind "3er-Pasch" Nothing False )
+        , ( "fourOfAKind", initEntry FourOfAKind "4er-Pasch" Nothing False )
+        , ( "fullHouse", initEntry FullHouse "FullHouse" Nothing False )
+        , ( "smallStraight", initEntry SmallStraight "Kleiner Straße" Nothing False )
+        , ( "largeStraight", initEntry LargeStraight "Große Straße" Nothing False )
+        , ( "yahtzee", initEntry Yahtzee "Yahztee" Nothing False )
+        , ( "chance", initEntry Chance "Chance" Nothing False )
+        ]
 
 
 init : () -> ( Model, Cmd Msg )
@@ -107,7 +100,8 @@ init _ =
     ( Model
         initDiceset
         initEntries
-        initControls
+        0
+        False
     , Cmd.none
     )
 
@@ -120,7 +114,7 @@ type Msg
     = HoldDice Int
     | RollDice
     | DiceRolled (List Dice.Face)
-    | EnterValue Entry
+    | EnterValue String
     | NextRound
 
 
@@ -206,6 +200,9 @@ applyRuleAndGetPoints default rule diceset =
 getEarnedPoints : Entry -> Diceset -> Int
 getEarnedPoints entry diceset =
     case entry.name of
+        Dummy ->
+            -42
+
         One ->
             sumUpFace 1 diceset
 
@@ -246,65 +243,45 @@ getEarnedPoints entry diceset =
             sumUpAll diceset
 
 
-updateEnterValue : Entry -> Model -> Model
-updateEnterValue entry model =
-    let
-        points =
-            getEarnedPoints entry model.diceset
+updateEnterValue : String -> Model -> Model
+updateEnterValue key model =
+    { model
+        | sheet =
+            Dict.map
+                (\k v ->
+                    if k == key && v.entered == False then
+                        { v
+                            | value =
+                                Just <|
+                                    getEarnedPoints v model.diceset
+                            , entered = True
+                        }
 
-        updateEntries : Entry -> Entry
-        updateEntries thisEntry =
-            if thisEntry.name == entry.name then
-                { thisEntry | value = points, entered = True }
-
-            else
-                thisEntry
-
-        newEntries =
-            List.map updateEntries model.entries
-    in
-    if not entry.entered then
-        { model | entries = newEntries }
-
-    else
-        model
+                    else
+                        v
+                )
+                model.sheet
+    }
 
 
 incrementRollCounter : Model -> Model
 incrementRollCounter model =
-    let
-        curControls =
-            model.controls
-
-        curCounter =
-            curControls.countRolls
-
-        newControls =
-            { curControls | countRolls = curCounter + 1 }
-    in
-    { model | controls = newControls }
+    { model | countRolls = model.countRolls + 1 }
 
 
 toggleValueEntered : Bool -> Model -> Model
 toggleValueEntered flag model =
-    let
-        curControls =
-            model.controls
-
-        newControls =
-            { curControls | valueEntered = flag }
-    in
-    { model | controls = newControls }
+    { model | valueEntered = flag }
 
 
-toTupleWithCmd : Cmd Msg -> Model -> ( Model, Cmd Msg )
-toTupleWithCmd msg model =
-    ( model, msg )
+leftOf : b -> a -> ( a, b )
+leftOf right left =
+    ( left, right )
 
 
-toTupleWithModel : Model -> Cmd Msg -> ( Model, Cmd Msg )
-toTupleWithModel model msg =
-    ( model, msg )
+rightOf : a -> b -> ( a, b )
+rightOf left right =
+    ( left, right )
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -315,10 +292,10 @@ update msg model =
                 |> Tuple.mapFirst (updateHoldDice index)
 
         RollDice ->
-            if model.controls.countRolls < 3 then
+            if model.countRolls < 3 then
                 model
                     |> incrementRollCounter
-                    |> toTupleWithCmd (Random.generate DiceRolled rollDiceset)
+                    |> leftOf (Random.generate DiceRolled rollDiceset)
 
             else
                 ( model, Cmd.none )
@@ -326,14 +303,14 @@ update msg model =
         DiceRolled result ->
             model
                 |> updateDiceRolled result
-                |> toTupleWithCmd Cmd.none
+                |> leftOf Cmd.none
 
-        EnterValue entry ->
-            if model.controls.valueEntered == False then
+        EnterValue key ->
+            if model.valueEntered == False then
                 model
-                    |> updateEnterValue entry
+                    |> updateEnterValue key
                     |> toggleValueEntered True
-                    |> toTupleWithCmd Cmd.none
+                    |> leftOf Cmd.none
 
             else
                 ( model, Cmd.none )
@@ -364,219 +341,65 @@ getDiceWidth width isHeld =
         width
 
 
-createListItemHtml : Int -> Dice -> Html Msg
-createListItemHtml index dice =
-    let
-        width =
-            getDiceWidth 100 dice.held
-    in
-    Html.li
-        [ onIngameClick (HoldDice index)
-        , Attributes.style "float" "left"
-        ]
-        [ Dice.toSvg width dice
-        ]
-
-
-createDiceListHtml : Diceset -> Html Msg
-createDiceListHtml diceset =
-    diceset
-        |> Array.indexedMap createListItemHtml
-        |> Array.toList
-        |> Html.ul
-            [ Attributes.style "list-style" "none"
-            , Attributes.style "clear" "both"
-            ]
-
-
-getEntryValue : Int -> String
-getEntryValue value =
-    if value < 0 then
-        " "
-
-    else
-        String.fromInt value
-
-
-getEntryName : EntryName -> String
-getEntryName name =
-    case name of
-        One ->
-            "One"
-
-        Two ->
-            "Two"
-
-        Three ->
-            "Three"
-
-        Four ->
-            "Four"
-
-        Five ->
-            "Five"
-
-        Six ->
-            "Six"
-
-        ThreeOfAKind ->
-            "3 Of A Kind"
-
-        FourOfAKind ->
-            "4 Of A Kind"
-
-        FullHouse ->
-            "Full House"
-
-        SmallStraight ->
-            "Small Straight"
-
-        LargeStraight ->
-            "Large Straight"
-
-        Yahtzee ->
-            "Yahtzee"
-
-        Chance ->
-            "Chance"
-
-
-createEntriesRowHtml : Entry -> Html Msg
-createEntriesRowHtml entry =
-    Html.tr
-        [ onIngameClick (EnterValue entry)
-        ]
-        [ Html.td [] [ Html.text (getEntryName entry.name ++ ":") ]
-        , Html.td [] [ Html.text (getEntryValue entry.value) ]
-        ]
-
-
-createEntriesHtml : List Entry -> Html Msg
-createEntriesHtml entries =
-    entries
-        |> List.map createEntriesRowHtml
-        |> Html.table []
-
-
-createRollCounterHtml : Controls -> Html Msg
-createRollCounterHtml controls =
-    Html.div
-        [ Attributes.style "clear" "both"
-        ]
-        [ Html.text <| "Rolls: " ++ String.fromInt controls.countRolls ]
-
-
-createButtonRollHtml : Controls -> Html Msg
-createButtonRollHtml controls =
-    let
-        isDisabled =
-            controls.countRolls == 3 || controls.valueEntered
-    in
-    Html.button
-        [ onIngameClick RollDice
-        , Attributes.style "clear" "both"
-        , Attributes.style "display" "block"
-        , Attributes.disabled isDisabled
-        ]
-        [ Html.text "Roll!"
-        ]
-
-
-createButtonNextRoundHtml : Controls -> Html Msg
-createButtonNextRoundHtml controls =
-    let
-        isDisabled =
-            not controls.valueEntered
-    in
-    Html.button
-        [ onIngameClick NextRound
-        , Attributes.disabled isDisabled
-        ]
-        [ Html.text "Next!"
-        ]
-
-
-
-{- }
-   createSumsHtml : List Entry -> Html Msg
-   createSumsHtml entries =
-       Html.div [] [ Html.text "Here be sums" ]
-
--}
-
-
-createSumsHtml : List Entry -> Html Msg
-createSumsHtml entries =
-    let
-        names =
-            [ "Ones", "Twos", "Threes", "Fours", "Fives", "Six" ]
-
-        folder entry reducer =
-            if List.member entry.name names then
-                if entry.entered then
-                    { reducer | upper = reducer.upper + entry.value }
-
-                else
-                    reducer
-
-            else if entry.entered then
-                { reducer | lower = reducer.lower + entry.value }
-
-            else
-                reducer
-
-        sums =
-            List.foldl folder { upper = 0, lower = 0 } entries
-
-        getBonus upper =
-            if upper >= 63 then
-                35
-
-            else
-                0
-    in
-    Html.table []
-        [ Html.tr []
-            [ Html.td [] [ Html.text "Sum Upper Part:" ]
-            , Html.td [] [ Html.text (String.fromInt sums.upper) ]
-            ]
-        , Html.tr []
-            [ Html.td [] [ Html.text "Bonus:" ]
-            , Html.td [] [ Html.text (String.fromInt (getBonus sums.upper)) ]
-            ]
-        , Html.tr []
-            [ Html.td [] [ Html.text "Sum Lower Part:" ]
-            , Html.td [] [ Html.text (String.fromInt sums.lower) ]
-            ]
-        , Html.tr []
-            [ Html.td [] [ Html.text "Sum All:" ]
-            , Html.td [] [ Html.text (String.fromInt (sums.upper + sums.lower + getBonus sums.upper)) ]
-            ]
-        ]
-
-
-type alias Document msg =
-    { title : String
-    , body : List (Html msg)
+type alias Edges =
+    { top : Int
+    , right : Int
+    , bottom : Int
+    , left : Int
     }
 
 
-view : Model -> Document Msg
+edges : Edges
+edges =
+    { top = 0
+    , right = 0
+    , bottom = 0
+    , left = 0
+    }
+
+
+viewDiceset : Diceset -> Element Msg
+viewDiceset diceset =
+    Array.toList diceset
+        |> List.map
+            (\dice ->
+                dice
+                    |> Dice.toSvg (getDiceWidth 100 dice.held)
+                    |> Element.html
+                    |> el
+                        [ width <| fillPortion 1
+
+                        --, height fill
+                        --, spaceEvenly
+                        , centerX
+                        , centerY
+                        ]
+            )
+        |> row
+            [ width fill
+            , height <| px 160
+            , centerX
+            , centerY
+            , explain Debug.todo
+            ]
+
+
+view : Model -> Html Msg
 view model =
-    { title = "Kniffel.elm"
-    , body =
-        [ Html.h1 [] [ Html.text "Kniffel.elm" ]
-        , Html.div
-            [ Attributes.id "kniffel_main" ]
-            [ createDiceListHtml model.diceset
-            , createRollCounterHtml model.controls
-            , createButtonNextRoundHtml model.controls
-            , createButtonRollHtml model.controls
-            , createEntriesHtml model.entries
-            , createSumsHtml model.entries
-            ]
+    layout
+        [ width <| px 600
+        , height <| px 800
         ]
-    }
+    <|
+        column
+            [ width <| px 600
+            , height <| px 800
+            , Border.width 2
+            , Border.color <| rgb255 0 0 0
+            ]
+            [ viewDiceset model.diceset
+            , el [ width fill, height fill ] none
+            ]
 
 
 
@@ -593,7 +416,7 @@ subscriptions model =
 
 
 main =
-    Browser.document
+    Browser.element
         { init = init
         , view = view
         , update = update

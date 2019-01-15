@@ -1,4 +1,4 @@
-module Rules exposing
+module Kniffel.Rules exposing
     ( Rule
     , isFourOfAKind
     , isFullHouse
@@ -10,7 +10,7 @@ module Rules exposing
 
 import Array exposing (Array)
 import Array.Extra as Array
-import Dice
+import Kniffel.Dice as Dice
 
 
 type alias Diceset =

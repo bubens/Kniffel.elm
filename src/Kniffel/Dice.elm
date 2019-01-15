@@ -1,4 +1,4 @@
-module Dice exposing
+module Kniffel.Dice exposing
     ( Dice, Face
     , create
     , roll, rollTo, hold, generateRandomFace, toInt, toString
