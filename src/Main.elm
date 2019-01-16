@@ -1,14 +1,16 @@
-module Main exposing (Diceset, Entry, EntryName(..), Model, Msg(..), Sheet, applyRuleAndGetPoints, getDiceWidth, getDicesetAsInts, getEarnedPoints, getSumOfValue, incrementRollCounter, init, initDiceset, initEntries, initEntry, leftOf, main, onIngameClick, rightOf, rollDiceset, subscriptions, sumUpAll, sumUpFace, toggleValueEntered, update, updateDiceRolled, updateEnterValue, updateHoldDice, view)
+module Main exposing (Diceset, Entry, EntryName(..), Model, Msg(..), Sheet, applyRuleAndGetPoints, getDiceWidth, getDicesetAsInts, getEarnedPoints, getSumOfValue, incrementRollCounter, init, initDiceset, initEntries, initEntry, leftOf, main, rightOf, rollDiceset, subscriptions, sumUpAll, sumUpFace, toggleValueEntered, update, updateDiceRolled, updateEnterValue, updateHoldDice, view)
 
 import Array exposing (Array)
 import Browser
 import Debug
 import Dict exposing (Dict)
 import Element exposing (..)
+import Element.Background as Background
 import Element.Border as Border
+import Element.Events as Events
+import Element.Font as Font
+import Element.Input as Input
 import Html exposing (Html)
-import Html.Attributes as Attributes
-import Html.Events as Events
 import Json.Decode as Json
 import Kniffel.Dice as Dice exposing (Dice)
 import Kniffel.Rules as Rules
@@ -321,13 +323,13 @@ update msg model =
 
 
 -- VIEW
-
-
-onIngameClick : Msg -> Html.Attribute Msg
-onIngameClick message =
-    Events.preventDefaultOn
-        "click"
-        (Json.map (\msg -> ( msg, True )) (Json.succeed message))
+{-
+   onIngameClick : Msg -> Html.Attribute Msg
+   onIngameClick message =
+       Events.preventDefaultOn
+           "click"
+           (Json.map (\msg -> ( msg, True )) (Json.succeed message))
+-}
 
 
 getDiceWidth : Int -> Bool -> Int
@@ -360,45 +362,108 @@ edges =
 
 viewDiceset : Diceset -> Element Msg
 viewDiceset diceset =
-    Array.toList diceset
-        |> List.map
-            (\dice ->
-                dice
-                    |> Dice.toSvg (getDiceWidth 100 dice.held)
+    diceset
+        |> Array.indexedMap
+            (\i dice ->
+                Dice.toSvg (getDiceWidth 100 dice.held) dice
                     |> Element.html
                     |> el
-                        [ width <| fillPortion 1
-
-                        --, height fill
-                        --, spaceEvenly
-                        , centerX
+                        [ centerX
                         , centerY
+                        , height <| px 100
+                        , Events.onMouseUp <| HoldDice i
+                        ]
+                    |> el
+                        [ width <| fillPortion 1
+                        , height fill
                         ]
             )
+        |> Array.toList
         |> row
             [ width fill
-            , height <| px 160
-            , centerX
-            , centerY
-            , explain Debug.todo
+            , height <| px 150
+
+            --, centerX
+            --, centerY
             ]
+
+
+viewButtonLabel : String -> Element Msg
+viewButtonLabel str =
+    text str
+        |> el
+            [ centerX
+            , centerY
+            , Font.variant Font.smallCaps
+            , Font.size 20
+            ]
+
+
+viewControls : Model -> Element Msg
+viewControls model =
+    row
+        [ width fill
+        , height <| px 50
+        , centerX
+        , centerY
+        ]
+        [ el
+            [ height fill
+            , width <| px 150
+            , Background.color <| rgb 0 0 255
+            ]
+            (text "Weiter")
+        , el
+            [ height fill
+            , width <| px 150
+            ]
+            (Input.button
+                [ width <| px 100
+                , height <| px 40
+                , centerX
+                , centerY
+                , Background.color <| rgb255 170 170 170
+                ]
+                { onPress = Just RollDice
+                , label = viewButtonLabel "Würfeln"
+                }
+            )
+        , el
+            [ height fill
+            , width <| px 300
+            , Background.color <| rgb255 255 0 0
+            ]
+            (text "Übrige Würfe: 1")
+        ]
+
+
+viewPlaceholder : Element Msg
+viewPlaceholder =
+    el
+        [ width fill
+        , height <| px 580
+        , Background.color <| rgb255 180 180 180
+        ]
+        (text "Here be content!")
 
 
 view : Model -> Html Msg
 view model =
     layout
-        [ width <| px 600
-        , height <| px 800
-        ]
+        []
     <|
         column
             [ width <| px 600
             , height <| px 800
-            , Border.width 2
+            , Border.width 10
             , Border.color <| rgb255 0 0 0
+            , Border.rounded 20
+
+            --, explain Debug.todo
             ]
             [ viewDiceset model.diceset
-            , el [ width fill, height fill ] none
+            , viewControls model
+            , viewPlaceholder
             ]
 
 
