@@ -323,13 +323,12 @@ update msg model =
 
 
 -- VIEW
-{-
-   onIngameClick : Msg -> Html.Attribute Msg
-   onIngameClick message =
-       Events.preventDefaultOn
-           "click"
-           (Json.map (\msg -> ( msg, True )) (Json.succeed message))
--}
+
+
+getTuple : comparable -> Dict comparable v -> Maybe ( comparable, v )
+getTuple cmp dict =
+    Dict.get cmp dict
+        |> Maybe.map (\v -> ( cmp, v ))
 
 
 getDiceWidth : Int -> Bool -> Int
@@ -388,15 +387,25 @@ viewDiceset diceset =
             ]
 
 
-viewButtonLabel : String -> Element Msg
-viewButtonLabel str =
-    text str
-        |> el
-            [ centerX
-            , centerY
-            , Font.variant Font.smallCaps
-            , Font.size 20
-            ]
+viewButton : String -> Msg -> Element Msg
+viewButton lbl msg =
+    Input.button
+        [ width <| px 100
+        , height <| px 40
+        , centerX
+        , centerY
+        , Background.color <| rgb255 170 170 170
+        ]
+        { onPress = Just msg
+        , label =
+            el
+                [ centerX
+                , centerY
+                , Font.variant Font.smallCaps
+                , Font.size 18
+                ]
+                (text lbl)
+        }
 
 
 viewControls : Model -> Element Msg
@@ -406,34 +415,66 @@ viewControls model =
         , height <| px 50
         , centerX
         , centerY
+
+        --, explain Debug.todo
         ]
         [ el
             [ height fill
             , width <| px 150
-            , Background.color <| rgb 0 0 255
             ]
-            (text "Weiter")
+            (viewButton "Weiter" NextRound)
         , el
             [ height fill
             , width <| px 150
             ]
-            (Input.button
-                [ width <| px 100
-                , height <| px 40
-                , centerX
-                , centerY
-                , Background.color <| rgb255 170 170 170
-                ]
-                { onPress = Just RollDice
-                , label = viewButtonLabel "Würfeln"
-                }
-            )
+            (viewButton "Würfeln" RollDice)
         , el
-            [ height fill
-            , width <| px 300
-            , Background.color <| rgb255 255 0 0
+            [ height shrink
+            , width shrink
+            , alignRight
+            , centerY
             ]
-            (text "Übrige Würfe: 1")
+            (text "Übrige Würfe: ")
+        , el
+            [ height shrink
+            , width <| px 150
+            , alignLeft
+            , centerY
+            , Font.size 30
+            ]
+            (text <| String.fromInt (3 - model.countRolls))
+        ]
+
+
+viewLeftSheet : Sheet -> Element Msg
+viewLeftSheet sheet =
+    column
+        [ width <| px 300
+        , height fill
+        ]
+        [ text "Left Sheet" ]
+
+
+viewRightSheet : Sheet -> Element Msg
+viewRightSheet sheet =
+    column
+        [ width <| px 300
+        , height fill
+        ]
+        [ text "Right Sheet" ]
+
+
+viewSheet : Sheet -> Element Msg
+viewSheet sheet =
+    row
+        [ width fill
+        , height <| px 500
+        , centerX
+        , centerY
+        , padding 20
+        ]
+        [ viewLeftSheet sheet
+        , viewRightSheet sheet
         ]
 
 
@@ -441,7 +482,7 @@ viewPlaceholder : Element Msg
 viewPlaceholder =
     el
         [ width fill
-        , height <| px 580
+        , height <| px 100
         , Background.color <| rgb255 180 180 180
         ]
         (text "Here be content!")
@@ -453,8 +494,8 @@ view model =
         []
     <|
         column
-            [ width <| px 600
-            , height <| px 800
+            [ width <| px 620
+            , height <| px 820
             , Border.width 10
             , Border.color <| rgb255 0 0 0
             , Border.rounded 20
@@ -463,6 +504,7 @@ view model =
             ]
             [ viewDiceset model.diceset
             , viewControls model
+            , viewSheet model.sheet
             , viewPlaceholder
             ]
 
