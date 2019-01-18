@@ -1,6 +1,7 @@
-module Main exposing (Diceset, Entry, EntryName(..), Model, Msg(..), Sheet, applyRuleAndGetPoints, getDiceWidth, getDicesetAsInts, getEarnedPoints, getSumOfValue, incrementRollCounter, init, initDiceset, initEntries, initEntry, leftOf, main, rightOf, rollDiceset, subscriptions, sumUpAll, sumUpFace, toggleValueEntered, update, updateDiceRolled, updateEnterValue, updateHoldDice, view)
+module Main exposing (Diceset, Entry, EntryName(..), Model, Msg(..), Sheet, applyRuleAndGetPoints, getDiceWidth, getDicesetAsInts, getEarnedPoints, getSumOfValue, incrementRollCounter, init, initDiceset, initEntry, initSheet, leftOf, main, rightOf, rollDiceset, subscriptions, sumUpAll, sumUpFace, toggleValueEntered, update, updateDiceRolled, updateEnterValue, updateHoldDice, view)
 
 import Array exposing (Array)
+import Array.Extra as Array
 import Browser
 import Debug
 import Dict exposing (Dict)
@@ -27,7 +28,7 @@ type alias Diceset =
 
 
 type EntryName
-    = Error
+    = Empty
     | One
     | Two
     | Three
@@ -43,11 +44,18 @@ type EntryName
     | Chance
 
 
+type Columns
+    = Left
+    | Right
+    | Error
+
+
 type alias Entry =
     { name : EntryName
     , label : String
     , value : Maybe Int
     , entered : Bool
+    , column : Columns
     }
 
 
@@ -55,21 +63,36 @@ type alias Sheet =
     Dict String Entry
 
 
+type alias Sums =
+    { left : Int
+    , bonus : Maybe Int
+    , right : Int
+    , all : Int
+    }
+
+
 type alias Model =
     { diceset : Diceset
     , sheet : Sheet
     , countRolls : Int
     , valueEntered : Bool
+    , sums : Sums
     }
 
 
+errorEntry : Entry
+errorEntry =
+    initEntry Empty "    " Nothing False Error
 
--- INIT
 
-
-initEntry : EntryName -> String -> Maybe Int -> Bool -> Entry
-initEntry name value held =
-    Entry name value held
+initEntry : EntryName -> String -> Maybe Int -> Bool -> Columns -> Entry
+initEntry name label value entered column =
+    { name = name
+    , label = label
+    , value = value
+    , entered = entered
+    , column = column
+    }
 
 
 initDiceset : Diceset
@@ -77,38 +100,53 @@ initDiceset =
     Array.repeat 5 Dice.create
 
 
-errorEntry : Entry
-errorEntry =
-    initEntry Error "Error" Nothing False
-
-
-initEntries : Sheet
-initEntries =
+initSheet : Sheet
+initSheet =
     Dict.fromList
         [ ( "error", errorEntry )
-        , ( "ones", initEntry One "1er" Nothing False )
-        , ( "twos", initEntry Two "2er" Nothing False )
-        , ( "threes", initEntry Three "3er" Nothing False )
-        , ( "fours", initEntry Four "4er" Nothing False )
-        , ( "fives", initEntry Five "5er" Nothing False )
-        , ( "sixs", initEntry Six "6er" Nothing False )
-        , ( "threeOfAKind", initEntry ThreeOfAKind "3er-Pasch" Nothing False )
-        , ( "fourOfAKind", initEntry FourOfAKind "4er-Pasch" Nothing False )
-        , ( "fullHouse", initEntry FullHouse "FullHouse" Nothing False )
-        , ( "smallStraight", initEntry SmallStraight "Kleiner Straße" Nothing False )
-        , ( "largeStraight", initEntry LargeStraight "Große Straße" Nothing False )
-        , ( "yahtzee", initEntry Yahtzee "Yahztee" Nothing False )
-        , ( "chance", initEntry Chance "Chance" Nothing False )
+        , ( "ones", initEntry One "1er" Nothing False Left )
+        , ( "twos", initEntry Two "2er" Nothing False Left )
+        , ( "threes", initEntry Three "3er" Nothing False Left )
+        , ( "fours", initEntry Four "4er" Nothing False Left )
+        , ( "fives", initEntry Five "5er" Nothing False Left )
+        , ( "sixs", initEntry Six "6er" Nothing False Left )
+        , ( "threeOfAKind", initEntry ThreeOfAKind "3er-Pasch" Nothing False Right )
+        , ( "fourOfAKind", initEntry FourOfAKind "4er-Pasch" Nothing False Right )
+        , ( "fullHouse", initEntry FullHouse "FullHouse" Nothing False Right )
+        , ( "smallStraight", initEntry SmallStraight "Kleiner Straße" Nothing False Right )
+        , ( "largeStraight", initEntry LargeStraight "Große Straße" Nothing False Right )
+        , ( "yahtzee", initEntry Yahtzee "Yahztee" Nothing False Right )
+        , ( "chance", initEntry Chance "Chance" Nothing False Right )
         ]
+
+
+initRollCount : Int
+initRollCount =
+    0
+
+
+initValueEntered : Bool
+initValueEntered =
+    False
+
+
+initSums : Sums
+initSums =
+    { left = 0
+    , bonus = Nothing
+    , right = 0
+    , all = 0
+    }
 
 
 init : () -> ( Model, Cmd Msg )
 init _ =
-    ( Model
-        initDiceset
-        initEntries
-        0
-        False
+    ( { diceset = initDiceset
+      , sheet = initSheet
+      , countRolls = initRollCount
+      , valueEntered = initValueEntered
+      , sums = initSums
+      }
     , Cmd.none
     )
 
@@ -137,7 +175,7 @@ getSumOfValue : Int -> List Int -> Int
 getSumOfValue value faces =
     faces
         |> List.filter (\x -> x == value)
-        |> List.foldl (+) 0
+        |> List.foldr (+) 0
 
 
 rollDiceset : Random.Generator (List Dice.Face)
@@ -149,15 +187,16 @@ rollDiceset =
 updateHoldDice : Int -> Model -> Model
 updateHoldDice index model =
     let
-        mapper i dice =
-            if i == index then
-                Dice.hold (not dice.held) dice
-
-            else
-                dice
-
         newDiceset =
-            Array.indexedMap mapper model.diceset
+            Array.indexedMap
+                (\i dice ->
+                    if i == index then
+                        Dice.hold (not dice.held) dice
+
+                    else
+                        dice
+                )
+                model.diceset
     in
     { model | diceset = newDiceset }
 
@@ -167,7 +206,11 @@ updateDiceRolled result model =
     let
         newDiceset =
             Array.toList model.diceset
-                |> List.map2 (\face -> \dice -> Dice.roll face dice) result
+                |> List.map2
+                    (\face dice ->
+                        Dice.roll face dice
+                    )
+                    result
                 |> Array.fromList
     in
     { model | diceset = newDiceset }
@@ -208,8 +251,8 @@ applyRuleAndGetPoints default rule diceset =
 getEarnedPoints : Entry -> Diceset -> Int
 getEarnedPoints entry diceset =
     case entry.name of
-        Error ->
-            404
+        Empty ->
+            -1
 
         One ->
             sumUpFace 1 diceset
@@ -230,22 +273,40 @@ getEarnedPoints entry diceset =
             sumUpFace 6 diceset
 
         ThreeOfAKind ->
-            applyRuleAndGetPoints (sumUpAll diceset) Rules.isThreeOfAKind diceset
+            applyRuleAndGetPoints
+                (sumUpAll diceset)
+                Rules.isThreeOfAKind
+                diceset
 
         FourOfAKind ->
-            applyRuleAndGetPoints (sumUpAll diceset) Rules.isFourOfAKind diceset
+            applyRuleAndGetPoints
+                (sumUpAll diceset)
+                Rules.isFourOfAKind
+                diceset
 
         FullHouse ->
-            applyRuleAndGetPoints 25 Rules.isFullHouse diceset
+            applyRuleAndGetPoints
+                25
+                Rules.isFullHouse
+                diceset
 
         SmallStraight ->
-            applyRuleAndGetPoints 30 Rules.isSmallStraight diceset
+            applyRuleAndGetPoints
+                30
+                Rules.isSmallStraight
+                diceset
 
         LargeStraight ->
-            applyRuleAndGetPoints 40 Rules.isLargeStraight diceset
+            applyRuleAndGetPoints
+                40
+                Rules.isLargeStraight
+                diceset
 
         Yahtzee ->
-            applyRuleAndGetPoints 50 Rules.isYahtzee diceset
+            applyRuleAndGetPoints
+                50
+                Rules.isYahtzee
+                diceset
 
         Chance ->
             sumUpAll diceset
@@ -253,23 +314,62 @@ getEarnedPoints entry diceset =
 
 updateEnterValue : String -> Model -> Model
 updateEnterValue key model =
-    { model
-        | sheet =
+    let
+        newSheet =
             Dict.map
-                (\k v ->
-                    if k == key && v.entered == False then
-                        { v
+                (\k e ->
+                    if k == key && e.entered == False then
+                        { e
                             | value =
                                 Just <|
-                                    getEarnedPoints v model.diceset
+                                    getEarnedPoints e model.diceset
                             , entered = True
                         }
 
                     else
-                        v
+                        e
                 )
                 model.sheet
-    }
+    in
+    { model | sheet = newSheet }
+
+
+updateSums : Model -> Model
+updateSums model =
+    let
+        newSums =
+            Dict.foldr
+                (\key entry acc ->
+                    let
+                        v =
+                            Maybe.withDefault 0 entry.value
+                    in
+                    case entry.column of
+                        Left ->
+                            { acc
+                                | left = acc.left + v
+                                , bonus =
+                                    if (acc.left + v) >= 63 then
+                                        Just 35
+
+                                    else
+                                        Nothing
+                                , all = acc.all + v
+                            }
+
+                        Right ->
+                            { acc
+                                | right = acc.right + v
+                                , all = acc.all + v
+                            }
+
+                        Error ->
+                            acc
+                )
+                initSums
+                model.sheet
+    in
+    { model | sums = newSums }
 
 
 incrementRollCounter : Model -> Model
@@ -280,16 +380,6 @@ incrementRollCounter model =
 toggleValueEntered : Bool -> Model -> Model
 toggleValueEntered flag model =
     { model | valueEntered = flag }
-
-
-leftOf : b -> a -> ( a, b )
-leftOf right left =
-    ( left, right )
-
-
-rightOf : a -> b -> ( a, b )
-rightOf left right =
-    ( left, right )
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -317,6 +407,7 @@ update msg model =
             if model.valueEntered == False then
                 model
                     |> updateEnterValue key
+                    |> updateSums
                     |> toggleValueEntered True
                     |> leftOf Cmd.none
 
@@ -332,12 +423,6 @@ update msg model =
 
 
 -- VIEW
-
-
-getBoth : comparable -> Dict comparable v -> Maybe ( comparable, v )
-getBoth cmp dict =
-    Dict.get cmp dict
-        |> Maybe.map (\v -> ( cmp, v ))
 
 
 getDiceWidth : Int -> Bool -> Int
@@ -390,9 +475,6 @@ viewDiceset diceset =
         |> row
             [ width fill
             , height <| px 150
-
-            --, centerX
-            --, centerY
             ]
 
 
@@ -459,8 +541,12 @@ valueToString : Maybe Int -> String
 valueToString v =
     case v of
         Just value ->
-            String.fromInt value
-                |> String.padLeft 3 ' '
+            if value > -1 then
+                String.fromInt value
+                    |> String.padLeft 3 ' '
+
+            else
+                valueToString Nothing
 
         Nothing ->
             "   "
@@ -473,7 +559,9 @@ viewEntry k sheet =
         createEl ( key, entry ) =
             el
                 [ width fill
-                , height <| px 46
+                , height <| px 50
+                , centerY
+                , centerX
                 , Events.onMouseUp
                     (if entry.entered then
                         Noop
@@ -488,7 +576,7 @@ viewEntry k sheet =
                     |> text
                 )
     in
-    getBoth k sheet
+    getValueWithKey k sheet
         |> Maybe.withDefault ( "error", errorEntry )
         |> createEl
 
@@ -496,7 +584,7 @@ viewEntry k sheet =
 viewLeftSheet : Sheet -> Element Msg
 viewLeftSheet sheet =
     column
-        [ width <| px 300
+        [ width <| px 280
         , height fill
 
         --, explain Debug.todo
@@ -507,13 +595,18 @@ viewLeftSheet sheet =
         , viewEntry "fours" sheet
         , viewEntry "fives" sheet
         , viewEntry "sixs" sheet
+        , el
+            [ width fill
+            , height <| px 45
+            ]
+            none
         ]
 
 
 viewRightSheet : Sheet -> Element Msg
 viewRightSheet sheet =
     column
-        [ width <| px 300
+        [ width <| px 280
         , height fill
         ]
         [ viewEntry "threeOfAKind" sheet
@@ -530,13 +623,71 @@ viewSheet : Sheet -> Element Msg
 viewSheet sheet =
     row
         [ width fill
-        , height <| px 500
+        , height <| px 390
         , centerX
-        , centerY
         , padding 20
+
+        --, explain Debug.todo
         ]
         [ viewLeftSheet sheet
         , viewRightSheet sheet
+        ]
+
+
+viewSum : String -> Int -> Element Msg
+viewSum label value =
+    let
+        txt =
+            String.fromInt value
+                |> String.padLeft 4 ' '
+                |> (++) (label ++ ":")
+    in
+    el
+        [ width fill
+        , height <| px 60
+        , Font.size 30
+        ]
+        (text txt)
+
+
+viewBonus : String -> Maybe Int -> Element Msg
+viewBonus label bonus =
+    let
+        txt =
+            bonus
+                |> Maybe.map (\v -> String.fromInt v)
+                |> Maybe.withDefault " "
+                |> String.padLeft 3 ' '
+                |> (++) (label ++ ":")
+    in
+    el
+        [ width fill
+        , height <| px 60
+        , Font.size 30
+        ]
+        (text txt)
+
+
+viewSums : Sums -> Element Msg
+viewSums sums =
+    row
+        [ width fill
+        , height <| px 180
+        , padding 30
+        ]
+        [ column
+            [ width <| px 270
+            , height fill
+            ]
+            [ viewSum "Gesamt links" sums.left
+            , viewBonus "Bonus links" sums.bonus
+            ]
+        , column
+            [ width <| px 270
+            , height fill
+            ]
+            [ viewSum "Gesamt rechts" sums.right
+            ]
         ]
 
 
@@ -544,7 +695,7 @@ viewPlaceholder : Element Msg
 viewPlaceholder =
     el
         [ width fill
-        , height <| px 100
+        , height <| px 50
         , Background.color <| rgb255 180 180 180
         ]
         (text "Here be content!")
@@ -564,10 +715,11 @@ view model =
 
             --, explain Debug.todo
             ]
-            [ viewDiceset model.diceset
-            , viewControls model
-            , viewSheet model.sheet
-            , viewPlaceholder
+            [ viewDiceset model.diceset -- 150
+            , viewControls model -- 50
+            , viewSheet model.sheet --390
+            , viewSums model.sums --> 180
+            , viewPlaceholder -- 50
             ]
 
 
@@ -591,3 +743,23 @@ main =
         , update = update
         , subscriptions = subscriptions
         }
+
+
+
+-- HELPER/UTILS
+
+
+leftOf : b -> a -> ( a, b )
+leftOf right left =
+    ( left, right )
+
+
+rightOf : a -> b -> ( a, b )
+rightOf left right =
+    ( left, right )
+
+
+getValueWithKey : comparable -> Dict comparable v -> Maybe ( comparable, v )
+getValueWithKey cmp dict =
+    Dict.get cmp dict
+        |> Maybe.map (\v -> ( cmp, v ))
