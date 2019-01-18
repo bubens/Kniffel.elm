@@ -27,7 +27,7 @@ type alias Diceset =
 
 
 type EntryName
-    = Dummy
+    = Error
     | One
     | Two
     | Three
@@ -77,10 +77,15 @@ initDiceset =
     Array.repeat 5 Dice.create
 
 
+errorEntry : Entry
+errorEntry =
+    initEntry Error "Error" Nothing False
+
+
 initEntries : Sheet
 initEntries =
     Dict.fromList
-        [ ( "dummy", initEntry Dummy "Dummy" Nothing False )
+        [ ( "error", errorEntry )
         , ( "ones", initEntry One "1er" Nothing False )
         , ( "twos", initEntry Two "2er" Nothing False )
         , ( "threes", initEntry Three "3er" Nothing False )
@@ -118,6 +123,7 @@ type Msg
     | DiceRolled (List Dice.Face)
     | EnterValue String
     | NextRound
+    | Noop
 
 
 getDicesetAsInts : Diceset -> List Int
@@ -202,8 +208,8 @@ applyRuleAndGetPoints default rule diceset =
 getEarnedPoints : Entry -> Diceset -> Int
 getEarnedPoints entry diceset =
     case entry.name of
-        Dummy ->
-            -42
+        Error ->
+            404
 
         One ->
             sumUpFace 1 diceset
@@ -320,13 +326,16 @@ update msg model =
         NextRound ->
             ( model, Cmd.none )
 
+        Noop ->
+            ( model, Cmd.none )
+
 
 
 -- VIEW
 
 
-getTuple : comparable -> Dict comparable v -> Maybe ( comparable, v )
-getTuple cmp dict =
+getBoth : comparable -> Dict comparable v -> Maybe ( comparable, v )
+getBoth cmp dict =
     Dict.get cmp dict
         |> Maybe.map (\v -> ( cmp, v ))
 
@@ -446,13 +455,59 @@ viewControls model =
         ]
 
 
+valueToString : Maybe Int -> String
+valueToString v =
+    case v of
+        Just value ->
+            String.fromInt value
+                |> String.padLeft 3 ' '
+
+        Nothing ->
+            "   "
+
+
+viewEntry : String -> Sheet -> Element Msg
+viewEntry k sheet =
+    let
+        createEl : ( String, Entry ) -> Element Msg
+        createEl ( key, entry ) =
+            el
+                [ width fill
+                , height <| px 46
+                , Events.onMouseUp
+                    (if entry.entered then
+                        Noop
+
+                     else
+                        EnterValue key
+                    )
+                ]
+                (entry.value
+                    |> valueToString
+                    |> (++) (entry.label ++ ":")
+                    |> text
+                )
+    in
+    getBoth k sheet
+        |> Maybe.withDefault ( "error", errorEntry )
+        |> createEl
+
+
 viewLeftSheet : Sheet -> Element Msg
 viewLeftSheet sheet =
     column
         [ width <| px 300
         , height fill
+
+        --, explain Debug.todo
         ]
-        [ text "Left Sheet" ]
+        [ viewEntry "ones" sheet
+        , viewEntry "twos" sheet
+        , viewEntry "threes" sheet
+        , viewEntry "fours" sheet
+        , viewEntry "fives" sheet
+        , viewEntry "sixs" sheet
+        ]
 
 
 viewRightSheet : Sheet -> Element Msg
@@ -461,7 +516,14 @@ viewRightSheet sheet =
         [ width <| px 300
         , height fill
         ]
-        [ text "Right Sheet" ]
+        [ viewEntry "threeOfAKind" sheet
+        , viewEntry "fourOfAKind" sheet
+        , viewEntry "fullHouse" sheet
+        , viewEntry "smallStraight" sheet
+        , viewEntry "largeStraight" sheet
+        , viewEntry "yahtzee" sheet
+        , viewEntry "chance" sheet
+        ]
 
 
 viewSheet : Sheet -> Element Msg
