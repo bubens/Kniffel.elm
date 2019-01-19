@@ -116,8 +116,8 @@ Specify newFace by Int. Returns Nothing if newFace is not a valid face.
         |> Maybe.withDefault "Error"
 
 -}
-rollTo : Dice -> Int -> Maybe Dice
-rollTo dice newFace =
+rollTo : Int -> Dice -> Maybe Dice
+rollTo newFace dice =
     case newFace of
         1 ->
             Just (roll One dice)
