@@ -122,7 +122,7 @@ initSheet =
 
 initRollCount : Int
 initRollCount =
-    0
+    1
 
 
 initValueEntered : Bool
@@ -147,7 +147,7 @@ init _ =
       , valueEntered = initValueEntered
       , sums = initSums
       }
-    , Cmd.none
+    , rollDiceMsg
     )
 
 
@@ -162,6 +162,11 @@ type Msg
     | EnterValue String
     | NextRound
     | Noop
+
+
+rollDiceMsg : Cmd Msg
+rollDiceMsg =
+    Random.generate DiceRolled rollDiceset
 
 
 getDicesetAsInts : Diceset -> List Int
@@ -337,7 +342,7 @@ updateEnterValue key model =
 updateSums : Model -> Model
 updateSums model =
     let
-        newSums =
+        sums =
             Dict.foldr
                 (\key entry acc ->
                     let
@@ -354,13 +359,11 @@ updateSums model =
 
                                     else
                                         Nothing
-                                , all = acc.all + v
                             }
 
                         Right ->
                             { acc
                                 | right = acc.right + v
-                                , all = acc.all + v
                             }
 
                         Error ->
@@ -368,6 +371,12 @@ updateSums model =
                 )
                 initSums
                 model.sheet
+
+        newSums =
+            { sums
+                | all =
+                    Maybe.withDefault 0 sums.bonus + sums.left + sums.right
+            }
     in
     { model | sums = newSums }
 
@@ -377,9 +386,39 @@ incrementRollCounter model =
     { model | countRolls = model.countRolls + 1 }
 
 
+setRollCounter : Int -> Model -> Model
+setRollCounter counter model =
+    { model | countRolls = counter }
+
+
 toggleValueEntered : Bool -> Model -> Model
 toggleValueEntered flag model =
     { model | valueEntered = flag }
+
+
+holdDiceset : Model -> Model
+holdDiceset model =
+    let
+        newDiceset =
+            Array.map (Dice.hold True) model.diceset
+    in
+    { model | diceset = newDiceset }
+
+
+resetDiceset : Model -> Model
+resetDiceset model =
+    let
+        newDiceset =
+            Array.map
+                (\dice ->
+                    dice
+                        |> Dice.hold False
+                        |> Dice.rollTo 1
+                        |> Maybe.withDefault Dice.create
+                )
+                model.diceset
+    in
+    { model | diceset = newDiceset }
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -390,10 +429,10 @@ update msg model =
                 |> Tuple.mapFirst (updateHoldDice index)
 
         RollDice ->
-            if model.countRolls < 3 then
+            if model.countRolls < 3 && not model.valueEntered then
                 model
                     |> incrementRollCounter
-                    |> leftOf (Random.generate DiceRolled rollDiceset)
+                    |> leftOf rollDiceMsg
 
             else
                 ( model, Cmd.none )
@@ -409,13 +448,23 @@ update msg model =
                     |> updateEnterValue key
                     |> updateSums
                     |> toggleValueEntered True
+                    |> holdDiceset
+                    |> setRollCounter 3
                     |> leftOf Cmd.none
 
             else
                 ( model, Cmd.none )
 
         NextRound ->
-            ( model, Cmd.none )
+            if model.valueEntered == True then
+                model
+                    |> toggleValueEntered False
+                    |> setRollCounter 1
+                    |> resetDiceset
+                    |> leftOf rollDiceMsg
+
+            else
+                ( model, Cmd.none )
 
         Noop ->
             ( model, Cmd.none )
@@ -507,7 +556,7 @@ viewControls model =
         , centerX
         , centerY
 
-        --, explain Debug.todo
+        ----, -- explain Debug.todo
         ]
         [ el
             [ height fill
@@ -587,7 +636,7 @@ viewLeftSheet sheet =
         [ width <| px 280
         , height fill
 
-        --, explain Debug.todo
+        ----, -- explain Debug.todo
         ]
         [ viewEntry "ones" sheet
         , viewEntry "twos" sheet
@@ -627,7 +676,7 @@ viewSheet sheet =
         , centerX
         , padding 20
 
-        --, explain Debug.todo
+        --, -- explain Debug.todo
         ]
         [ viewLeftSheet sheet
         , viewRightSheet sheet
@@ -644,8 +693,7 @@ viewSum label value =
     in
     el
         [ width fill
-        , height <| px 60
-        , Font.size 30
+        , height <| px 45
         ]
         (text txt)
 
@@ -662,32 +710,44 @@ viewBonus label bonus =
     in
     el
         [ width fill
-        , height <| px 60
-        , Font.size 30
+        , height <| px 45
         ]
         (text txt)
 
 
 viewSums : Sums -> Element Msg
 viewSums sums =
-    row
+    column
         [ width fill
-        , height <| px 180
-        , padding 30
+        , height <| px 155
+        , paddingXY 20 0
+
+        --, -- explain Debug.todo
         ]
-        [ column
-            [ width <| px 270
-            , height fill
+        [ row
+            [ width fill
+            , height shrink
             ]
-            [ viewSum "Gesamt links" sums.left
-            , viewBonus "Bonus links" sums.bonus
+            [ column
+                [ width <| px 270
+                , height fill
+                ]
+                [ viewSum "Gesamt links" sums.left
+                , viewBonus "Bonus links" sums.bonus
+                ]
+            , column
+                [ width <| px 270
+                , height fill
+                ]
+                [ viewSum "Gesamt rechts" sums.right
+                ]
             ]
-        , column
-            [ width <| px 270
-            , height fill
+        , row
+            [ width fill
+            , height <| px 45
+            , centerX
             ]
-            [ viewSum "Gesamt rechts" sums.right
-            ]
+            [ viewSum "Gesamt" sums.all ]
         ]
 
 
@@ -713,7 +773,7 @@ view model =
             , Border.color <| rgb255 0 0 0
             , Border.rounded 20
 
-            --, explain Debug.todo
+            --, -- explain Debug.todo
             ]
             [ viewDiceset model.diceset -- 150
             , viewControls model -- 50
