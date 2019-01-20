@@ -1,9 +1,8 @@
-module Main exposing (Diceset, Entry, EntryName(..), Model, Msg(..), Sheet, applyRuleAndGetPoints, getDiceWidth, getDicesetAsInts, getEarnedPoints, getSumOfValue, incrementRollCounter, init, initDiceset, initEntry, initSheet, leftOf, main, rightOf, rollDiceset, subscriptions, sumUpAll, sumUpFace, toggleValueEntered, update, updateDiceRolled, updateEnterValue, updateHoldDice, view)
+module Main exposing (Columns(..), Diceset, Edges, Entry, EntryName(..), Model, Msg(..), Sheet, Sums, decrementRollCounterBy, edges, errorEntry, getDiceWidth, getDicesetAsInts, getEarnedPoints, getSumOfValue, getValueWithKey, holdDiceAt, holdDiceset, init, initDiceset, initEntry, initSheet, initSums, main, pairWith, resetDiceset, returnIfRulePasses, rightOf, rollDiceMsg, rollDiceset, setRollCounter, setValueEntered, subscriptions, sumOfAll, sumOfFace, update, updateDiceset, updateEntry, updateGameOver, updateSums, valueToString, view, viewBonus, viewControlButton, viewControls, viewDiceset, viewEntry, viewGameOver, viewLeftSheet, viewPlaceholder, viewRightSheet, viewSheet, viewSum, viewSums)
 
 import Array exposing (Array)
 import Array.Extra as Array
 import Browser
-import Debug
 import Dict exposing (Dict)
 import Element exposing (..)
 import Element.Background as Background
@@ -12,7 +11,6 @@ import Element.Events as Events
 import Element.Font as Font
 import Element.Input as Input
 import Html exposing (Html)
-import Json.Decode as Json
 import Kniffel.Dice as Dice exposing (Dice)
 import Kniffel.Rules as Rules
 import List
@@ -74,15 +72,16 @@ type alias Sums =
 type alias Model =
     { diceset : Diceset
     , sheet : Sheet
-    , countRolls : Int
+    , rollsLeft : Int
     , valueEntered : Bool
     , sums : Sums
+    , gameOver : Bool
     }
 
 
 errorEntry : Entry
 errorEntry =
-    initEntry Empty "    " Nothing False Error
+    initEntry Empty "    " Nothing True Error
 
 
 initEntry : EntryName -> String -> Maybe Int -> Bool -> Columns -> Entry
@@ -120,16 +119,6 @@ initSheet =
         ]
 
 
-initRollCount : Int
-initRollCount =
-    1
-
-
-initValueEntered : Bool
-initValueEntered =
-    False
-
-
 initSums : Sums
 initSums =
     { left = 0
@@ -143,9 +132,10 @@ init : () -> ( Model, Cmd Msg )
 init _ =
     ( { diceset = initDiceset
       , sheet = initSheet
-      , countRolls = initRollCount
-      , valueEntered = initValueEntered
+      , rollsLeft = 3
+      , valueEntered = False
       , sums = initSums
+      , gameOver = False
       }
     , rollDiceMsg
     )
@@ -189,8 +179,23 @@ rollDiceset =
         |> Random.list 5
 
 
-updateHoldDice : Int -> Model -> Model
-updateHoldDice index model =
+updateDiceset : List Dice.Face -> Model -> Model
+updateDiceset result model =
+    let
+        newDiceset =
+            Array.toList model.diceset
+                |> List.map2
+                    (\face dice ->
+                        Dice.roll face dice
+                    )
+                    result
+                |> Array.fromList
+    in
+    { model | diceset = newDiceset }
+
+
+holdDiceAt : Int -> Model -> Model
+holdDiceAt index model =
     let
         newDiceset =
             Array.indexedMap
@@ -206,23 +211,8 @@ updateHoldDice index model =
     { model | diceset = newDiceset }
 
 
-updateDiceRolled : List Dice.Face -> Model -> Model
-updateDiceRolled result model =
-    let
-        newDiceset =
-            Array.toList model.diceset
-                |> List.map2
-                    (\face dice ->
-                        Dice.roll face dice
-                    )
-                    result
-                |> Array.fromList
-    in
-    { model | diceset = newDiceset }
-
-
-sumUpFace : Int -> Diceset -> Int
-sumUpFace x diceset =
+sumOfFace : Int -> Diceset -> Int
+sumOfFace x diceset =
     let
         sumIfFace : Int -> Int -> Int
         sumIfFace v a =
@@ -237,15 +227,15 @@ sumUpFace x diceset =
         |> List.foldl sumIfFace 0
 
 
-sumUpAll : Diceset -> Int
-sumUpAll diceset =
+sumOfAll : Diceset -> Int
+sumOfAll diceset =
     diceset
         |> getDicesetAsInts
         |> List.sum
 
 
-applyRuleAndGetPoints : Int -> Rules.Rule -> Diceset -> Int
-applyRuleAndGetPoints default rule diceset =
+returnIfRulePasses : Int -> Rules.Rule -> Diceset -> Int
+returnIfRulePasses default rule diceset =
     if rule diceset then
         default
 
@@ -257,68 +247,68 @@ getEarnedPoints : Entry -> Diceset -> Int
 getEarnedPoints entry diceset =
     case entry.name of
         Empty ->
-            -1
+            -404
 
         One ->
-            sumUpFace 1 diceset
+            sumOfFace 1 diceset
 
         Two ->
-            sumUpFace 2 diceset
+            sumOfFace 2 diceset
 
         Three ->
-            sumUpFace 3 diceset
+            sumOfFace 3 diceset
 
         Four ->
-            sumUpFace 4 diceset
+            sumOfFace 4 diceset
 
         Five ->
-            sumUpFace 5 diceset
+            sumOfFace 5 diceset
 
         Six ->
-            sumUpFace 6 diceset
+            sumOfFace 6 diceset
 
         ThreeOfAKind ->
-            applyRuleAndGetPoints
-                (sumUpAll diceset)
+            returnIfRulePasses
+                (sumOfAll diceset)
                 Rules.isThreeOfAKind
                 diceset
 
         FourOfAKind ->
-            applyRuleAndGetPoints
-                (sumUpAll diceset)
+            returnIfRulePasses
+                (sumOfAll diceset)
                 Rules.isFourOfAKind
                 diceset
 
         FullHouse ->
-            applyRuleAndGetPoints
+            returnIfRulePasses
                 25
                 Rules.isFullHouse
                 diceset
 
         SmallStraight ->
-            applyRuleAndGetPoints
+            returnIfRulePasses
                 30
                 Rules.isSmallStraight
                 diceset
 
         LargeStraight ->
-            applyRuleAndGetPoints
+            returnIfRulePasses
                 40
                 Rules.isLargeStraight
                 diceset
 
         Yahtzee ->
-            applyRuleAndGetPoints
+            returnIfRulePasses
                 50
                 Rules.isYahtzee
                 diceset
 
         Chance ->
-            sumUpAll diceset
+            sumOfAll diceset
 
 
-updateEnterValue : String -> Model -> Model
-updateEnterValue key model =
+updateEntry : String -> Model -> Model
+updateEntry key model =
     let
         newSheet =
             Dict.map
@@ -381,18 +371,18 @@ updateSums model =
     { model | sums = newSums }
 
 
-incrementRollCounter : Model -> Model
-incrementRollCounter model =
-    { model | countRolls = model.countRolls + 1 }
+decrementRollCounterBy : Int -> Model -> Model
+decrementRollCounterBy x model =
+    { model | rollsLeft = model.rollsLeft - x }
 
 
 setRollCounter : Int -> Model -> Model
 setRollCounter counter model =
-    { model | countRolls = counter }
+    { model | rollsLeft = counter }
 
 
-toggleValueEntered : Bool -> Model -> Model
-toggleValueEntered flag model =
+setValueEntered : Bool -> Model -> Model
+setValueEntered flag model =
     { model | valueEntered = flag }
 
 
@@ -421,36 +411,51 @@ resetDiceset model =
     { model | diceset = newDiceset }
 
 
+updateGameOver : Model -> Model
+updateGameOver model =
+    let
+        newGameOver =
+            Dict.foldr
+                (\k value acc ->
+                    acc && value.entered
+                )
+                True
+                model.sheet
+    in
+    { model | gameOver = newGameOver }
+
+
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
         HoldDice index ->
-            ( model, Cmd.none )
-                |> Tuple.mapFirst (updateHoldDice index)
+            model
+                |> holdDiceAt index
+                |> pairWith Cmd.none
 
         RollDice ->
-            if model.countRolls < 3 && not model.valueEntered then
-                model
-                    |> incrementRollCounter
-                    |> leftOf rollDiceMsg
+            if model.rollsLeft > 0 && not model.valueEntered then
+                ( model, rollDiceMsg )
 
             else
                 ( model, Cmd.none )
 
         DiceRolled result ->
             model
-                |> updateDiceRolled result
-                |> leftOf Cmd.none
+                |> updateDiceset result
+                |> decrementRollCounterBy 1
+                |> pairWith Cmd.none
 
         EnterValue key ->
             if model.valueEntered == False then
                 model
-                    |> updateEnterValue key
+                    |> updateEntry key
                     |> updateSums
-                    |> toggleValueEntered True
+                    |> setValueEntered True
+                    |> setRollCounter 0
                     |> holdDiceset
-                    |> setRollCounter 3
-                    |> leftOf Cmd.none
+                    |> updateGameOver
+                    |> pairWith Cmd.none
 
             else
                 ( model, Cmd.none )
@@ -458,10 +463,10 @@ update msg model =
         NextRound ->
             if model.valueEntered == True then
                 model
-                    |> toggleValueEntered False
-                    |> setRollCounter 1
+                    |> setValueEntered False
+                    |> setRollCounter 3
                     |> resetDiceset
-                    |> leftOf rollDiceMsg
+                    |> pairWith rollDiceMsg
 
             else
                 ( model, Cmd.none )
@@ -527,16 +532,27 @@ viewDiceset diceset =
             ]
 
 
-viewButton : String -> Msg -> Element Msg
-viewButton lbl msg =
+viewControlButton : Model -> Element Msg
+viewControlButton model =
+    let
+        button =
+            if model.gameOver then
+                ( "GameOver", Nothing )
+
+            else if model.valueEntered && model.rollsLeft == 0 then
+                ( "Nächster Durchgang", Just NextRound )
+
+            else
+                ( "Würfeln", Just RollDice )
+    in
     Input.button
-        [ width <| px 100
+        [ width <| px 280
         , height <| px 40
         , centerX
         , centerY
         , Background.color <| rgb255 170 170 170
         ]
-        { onPress = Just msg
+        { onPress = Tuple.second button
         , label =
             el
                 [ centerX
@@ -544,7 +560,7 @@ viewButton lbl msg =
                 , Font.variant Font.smallCaps
                 , Font.size 18
                 ]
-                (text lbl)
+                (text <| Tuple.first button)
         }
 
 
@@ -555,19 +571,12 @@ viewControls model =
         , height <| px 50
         , centerX
         , centerY
-
-        ----, -- explain Debug.todo
         ]
         [ el
             [ height fill
-            , width <| px 150
+            , width <| px 300
             ]
-            (viewButton "Weiter" NextRound)
-        , el
-            [ height fill
-            , width <| px 150
-            ]
-            (viewButton "Würfeln" RollDice)
+            (viewControlButton model)
         , el
             [ height shrink
             , width shrink
@@ -582,7 +591,7 @@ viewControls model =
             , centerY
             , Font.size 30
             ]
-            (text <| String.fromInt (3 - model.countRolls))
+            (text <| String.fromInt model.rollsLeft)
         ]
 
 
@@ -635,8 +644,6 @@ viewLeftSheet sheet =
     column
         [ width <| px 280
         , height fill
-
-        ----, -- explain Debug.todo
         ]
         [ viewEntry "ones" sheet
         , viewEntry "twos" sheet
@@ -675,8 +682,6 @@ viewSheet sheet =
         , height <| px 390
         , centerX
         , padding 20
-
-        --, -- explain Debug.todo
         ]
         [ viewLeftSheet sheet
         , viewRightSheet sheet
@@ -721,8 +726,6 @@ viewSums sums =
         [ width fill
         , height <| px 155
         , paddingXY 20 0
-
-        --, -- explain Debug.todo
         ]
         [ row
             [ width fill
@@ -761,19 +764,63 @@ viewPlaceholder =
         (text "Here be content!")
 
 
+viewGameOver : Model -> Attribute Msg
+viewGameOver model =
+    Element.inFront <|
+        Element.el
+            [ width <| px 500
+            , height <| px 300
+            , Border.width 5
+            , Border.rounded 20
+            , Border.color <| rgb255 0 0 0
+            , Background.color <| rgb255 255 255 255
+            , centerX
+            , centerY
+            ]
+        <|
+            column
+                [ width fill
+                , height fill
+                ]
+                [ el
+                    [ width fill
+                    , height <| fillPortion 2
+                    , Font.size 40
+                    , centerX
+                    , centerY
+                    ]
+                    (text "Game Over")
+                , el
+                    [ width fill
+                    , height <| fillPortion 3
+                    , Font.size 30
+                    , centerX
+                    , centerY
+                    ]
+                    (text
+                        ("Du hast "
+                            ++ String.fromInt model.sums.all
+                            ++ " Punkte erreicht."
+                        )
+                    )
+                ]
+
+
 view : Model -> Html Msg
 view model =
     layout
-        []
-    <|
-        column
+        (if model.gameOver then
+            [ viewGameOver model ]
+
+         else
+            []
+        )
+        (column
             [ width <| px 620
             , height <| px 820
             , Border.width 10
             , Border.color <| rgb255 0 0 0
             , Border.rounded 20
-
-            --, -- explain Debug.todo
             ]
             [ viewDiceset model.diceset -- 150
             , viewControls model -- 50
@@ -781,6 +828,7 @@ view model =
             , viewSums model.sums --> 180
             , viewPlaceholder -- 50
             ]
+        )
 
 
 
@@ -809,8 +857,8 @@ main =
 -- HELPER/UTILS
 
 
-leftOf : b -> a -> ( a, b )
-leftOf right left =
+pairWith : b -> a -> ( a, b )
+pairWith right left =
     ( left, right )
 
 
