@@ -1,0 +1,48 @@
+<html>
+<head>
+  <title>Kniffel.elm - a prototype</title>
+  <meta name="viewport" content="width=620, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <style>
+  	#h1 {
+  		width: 100%;
+  		text-align: center;
+  		border-bottom: 1px solid #000;
+  	}
+    #kniffel {
+    	position: absolute;
+    	left: 30%;
+    }
+  </style>
+  <script src="kniffel.min.js"></script>
+</head>
+<body>
+  <h1>Kniffel.elm - ein Prototyp</h1>
+  <div id="kniffel">
+  	<span></span>
+  </div>
+  <script>
+    const kniffel = 
+    		Elm.Main.init(
+    			{ node: document.querySelector("#kniffel span") }
+    		);
+
+    function posLeftForCenter( element, window ) {
+    	const elementWidth = element.offsetWidth;
+    	const innerWidth = window.innerWidth;
+
+    	return Math.floor( (innerWidth - elementWidth) / 2 );
+    }
+
+    function main( window ) {
+    	const element = document.getElementById("kniffel");
+    	const posLeft = posLeftForCenter( element, window );
+
+    	if ( posLeft > 0 ) {
+    		element.style.left = posLeft;
+    	}
+    }
+
+    main( window );
+  </script>
+</body>
+</html>
