@@ -24,7 +24,7 @@ type alias Rule =
 asInts : Diceset -> List Int
 asInts diceset =
     diceset
-        |> Array.map (\dice -> Dice.toInt dice)
+        |> Array.map Dice.toInt
         |> Array.toList
 
 
@@ -32,10 +32,8 @@ countEachFace : Diceset -> List Int
 countEachFace diceset =
     let
         counter : Int -> Array Int -> Array Int
-        counter =
-            \x ->
-                \array ->
-                    Array.update (x - 1) ((+) 1) array
+        counter x array =
+            Array.update (x - 1) ((+) 1) array
     in
     diceset
         |> asInts
@@ -47,7 +45,9 @@ hasNEqualFaces : Int -> Diceset -> Bool
 hasNEqualFaces n diceset =
     diceset
         |> countEachFace
-        |> List.member n
+        |> List.foldl
+            (\x t -> (x >= n) || t)
+            False
 
 
 isStraightOfLength : Int -> Diceset -> Bool
