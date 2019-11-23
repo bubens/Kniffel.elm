@@ -53,6 +53,7 @@ type alias Entry =
     , label : String
     , value : Maybe Int
     , entered : Bool
+    , hovered : Bool
     , column : Columns
     }
 
@@ -81,15 +82,16 @@ type alias Model =
 
 errorEntry : Entry
 errorEntry =
-    initEntry Empty "    " Nothing True Error
+    initEntry Empty "    " Nothing True True Error
 
 
-initEntry : EntryName -> String -> Maybe Int -> Bool -> Columns -> Entry
-initEntry name label value entered column =
+initEntry : EntryName -> String -> Maybe Int -> Bool -> Bool -> Columns -> Entry
+initEntry name label value entered hovered column =
     { name = name
     , label = label
     , value = value
     , entered = entered
+    , hovered = hovered
     , column = column
     }
 
@@ -103,19 +105,19 @@ initSheet : Sheet
 initSheet =
     Dict.fromList
         [ ( "error", errorEntry )
-        , ( "ones", initEntry One "1er" Nothing False Left )
-        , ( "twos", initEntry Two "2er" Nothing False Left )
-        , ( "threes", initEntry Three "3er" Nothing False Left )
-        , ( "fours", initEntry Four "4er" Nothing False Left )
-        , ( "fives", initEntry Five "5er" Nothing False Left )
-        , ( "sixs", initEntry Six "6er" Nothing False Left )
-        , ( "threeOfAKind", initEntry ThreeOfAKind "3er-Pasch" Nothing False Right )
-        , ( "fourOfAKind", initEntry FourOfAKind "4er-Pasch" Nothing False Right )
-        , ( "fullHouse", initEntry FullHouse "FullHouse" Nothing False Right )
-        , ( "smallStraight", initEntry SmallStraight "Kleiner Straße" Nothing False Right )
-        , ( "largeStraight", initEntry LargeStraight "Große Straße" Nothing False Right )
-        , ( "yahtzee", initEntry Yahtzee "Yahztee" Nothing False Right )
-        , ( "chance", initEntry Chance "Chance" Nothing False Right )
+        , ( "ones", initEntry One "1er" Nothing False False Left )
+        , ( "twos", initEntry Two "2er" Nothing False False Left )
+        , ( "threes", initEntry Three "3er" Nothing False False Left )
+        , ( "fours", initEntry Four "4er" Nothing False False Left )
+        , ( "fives", initEntry Five "5er" Nothing False False Left )
+        , ( "sixs", initEntry Six "6er" Nothing False False Left )
+        , ( "threeOfAKind", initEntry ThreeOfAKind "3er-Pasch" Nothing False False Right )
+        , ( "fourOfAKind", initEntry FourOfAKind "4er-Pasch" Nothing False False Right )
+        , ( "fullHouse", initEntry FullHouse "FullHouse" Nothing False False Right )
+        , ( "smallStraight", initEntry SmallStraight "Kleiner Straße" Nothing False False Right )
+        , ( "largeStraight", initEntry LargeStraight "Große Straße" Nothing False False Right )
+        , ( "yahtzee", initEntry Yahtzee "Yahztee" Nothing False False Right )
+        , ( "chance", initEntry Chance "Chance" Nothing False False Right )
         ]
 
 
@@ -150,6 +152,7 @@ type Msg
     | RollDice
     | DiceRolled (List Dice.Face)
     | EnterValue String
+    | HoverValue String Bool
     | NextRound
     | Noop
 
@@ -460,6 +463,26 @@ update msg model =
             else
                 ( model, Cmd.none )
 
+        HoverValue entryKey isOver ->
+            if model.valueEntered == False then
+                let
+                    newSheet =
+                        Dict.map
+                            (\key entry ->
+                                if key == entryKey then
+                                    { entry | hovered = isOver }
+
+                                else
+                                    entry
+                            )
+                            model.sheet
+                in
+                { model | sheet = newSheet }
+                    |> pairWith Cmd.none
+
+            else
+                ( model, Cmd.none )
+
         NextRound ->
             if model.valueEntered == True then
                 model
@@ -620,12 +643,33 @@ viewEntry k sheet =
                 , height <| px 50
                 , centerY
                 , centerX
+                , Background.color
+                    (if entry.hovered then
+                        rgb255 178 178 178
+
+                     else
+                        rgb255 255 255 255
+                    )
                 , Events.onMouseUp
                     (if entry.entered then
                         Noop
 
                      else
                         EnterValue key
+                    )
+                , Events.onMouseEnter
+                    (if entry.entered then
+                        Noop
+
+                     else
+                        HoverValue key True
+                    )
+                , Events.onMouseLeave
+                    (if entry.entered then
+                        Noop
+
+                     else
+                        HoverValue key False
                     )
                 ]
                 (entry.value
