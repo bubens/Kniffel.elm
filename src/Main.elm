@@ -540,12 +540,15 @@ viewDiceset diceset =
                     |> el
                         [ centerX
                         , centerY
-                        , height <| px 100
+                        , height <| shrink
+                        , width <| shrink
                         , Events.onMouseUp <| HoldDice i
                         ]
                     |> el
                         [ width <| fillPortion 1
                         , height fill
+                        , centerX
+                        , centerY
                         ]
             )
         |> Array.toList
